@@ -218,7 +218,7 @@ function HomeView({
         <div className="section-title">
           <h2>本月明细</h2>
         </div>
-        {items.length === 0 ? <EmptyState /> : <TransactionList items={items} goEdit={goEdit} />}
+        {items.length === 0 ? <EmptyState /> : <TransactionList items={items} categories={categories} goEdit={goEdit} />}
       </section>
     </>
   );
@@ -494,10 +494,12 @@ function useCategories() {
 
 function TransactionList({
   items,
+  categories,
   goEdit,
   compact = false,
 }: {
   items: Transaction[];
+  categories: ReturnType<typeof useCategories>;
   goEdit: (transaction: Transaction) => void;
   compact?: boolean;
 }) {
@@ -520,33 +522,36 @@ function TransactionList({
         {Object.entries(groups).map(([date, records]) => (
           <div className="day-group" key={date}>
             {!compact && <DateHeader date={date} records={records} />}
-            {records.map((item) => (
-              <article key={item.id} className="transaction-row clickable timeline-row" onClick={() => selectItem(item)}>
-                <time>{formatRecordTime(item)}</time>
-                <div className="timeline-dot" />
-                <div
-                  className="transaction-pill"
-                  style={
-                    {
-                      "--row-bg": categoryTone(item.category, item.type).bg,
-                      "--row-fg": categoryTone(item.category, item.type).fg,
-                    } as React.CSSProperties
-                  }
-                >
-                  <div className="category-icon">
-                    <CategoryIcon category={item.category} type={item.type} />
+            {records.map((item) => {
+              const meta = getCategoryMeta(item, categories);
+              return (
+                <article key={item.id} className="transaction-row clickable timeline-row" onClick={() => selectItem(item)}>
+                  <time>{formatRecordTime(item)}</time>
+                  <div className="timeline-dot" />
+                  <div
+                    className="transaction-pill"
+                    style={
+                      {
+                        "--row-bg": softColor(meta.color),
+                        "--row-fg": meta.color,
+                      } as React.CSSProperties
+                    }
+                  >
+                    <div className="category-icon">
+                      <CategoryIcon icon={meta.icon} />
+                    </div>
+                    <div className="row-main">
+                      <strong>{item.category}</strong>
+                      <span>{[item.account, item.note].filter(Boolean).join(" · ") || typeLabel[item.type]}</span>
+                    </div>
+                    <div className={`row-amount ${item.type}`}>
+                      {item.type === "expense" ? "-" : "+"}
+                      {currency.format(item.amount).replace("¥", "")}
+                    </div>
                   </div>
-                  <div className="row-main">
-                    <strong>{item.category}</strong>
-                    <span>{[item.account, item.note].filter(Boolean).join(" · ") || typeLabel[item.type]}</span>
-                  </div>
-                  <div className={`row-amount ${item.type}`}>
-                    {item.type === "expense" ? "-" : "+"}
-                    {currency.format(item.amount).replace("¥", "")}
-                  </div>
-                </div>
-              </article>
-            ))}
+                </article>
+              );
+            })}
           </div>
         ))}
       </div>
@@ -628,32 +633,50 @@ function formatAmountPlain(value: number) {
   }).format(value);
 }
 
-function CategoryIcon({ category, type }: { category: string; type: TransactionType }) {
+const categoryIconOptions = [
+  { value: "food", label: "餐饮" },
+  { value: "bus", label: "交通" },
+  { value: "shopping", label: "购物" },
+  { value: "home", label: "居住" },
+  { value: "health", label: "医疗" },
+  { value: "game", label: "娱乐" },
+  { value: "daily", label: "日用" },
+  { value: "money", label: "钱币" },
+  { value: "piggy", label: "储蓄" },
+  { value: "wallet", label: "钱包" },
+];
+
+function CategoryIcon({ icon }: { icon?: string }) {
   const props = { size: 26, strokeWidth: 2.8 };
-  if (type === "income") return category === "工资" ? <CircleDollarSign {...props} /> : <PiggyBank {...props} />;
-  if (category === "餐饮") return <Utensils {...props} />;
-  if (category === "交通") return <Bus {...props} />;
-  if (category === "购物") return <ShoppingBag {...props} />;
-  if (category === "居住") return <House {...props} />;
-  if (category === "医疗") return <HeartPulse {...props} />;
-  if (category === "娱乐") return <Gamepad2 {...props} />;
-  if (category === "日用") return <Zap {...props} />;
+  if (icon === "food") return <Utensils {...props} />;
+  if (icon === "bus") return <Bus {...props} />;
+  if (icon === "shopping") return <ShoppingBag {...props} />;
+  if (icon === "home") return <House {...props} />;
+  if (icon === "health") return <HeartPulse {...props} />;
+  if (icon === "game") return <Gamepad2 {...props} />;
+  if (icon === "daily") return <Zap {...props} />;
+  if (icon === "money") return <CircleDollarSign {...props} />;
+  if (icon === "piggy") return <PiggyBank {...props} />;
   return <Wallet {...props} />;
 }
 
-function categoryTone(category: string, type: TransactionType) {
-  if (type === "income") return { bg: "#d9e7d6", fg: "#2f6f5e" };
-  const map: Record<string, { bg: string; fg: string }> = {
-    餐饮: { bg: "#f5caca", fg: "#df5750" },
-    购物: { bg: "#c7e1e2", fg: "#3a8d8f" },
-    交通: { bg: "#d9e2f2", fg: "#4776b4" },
-    居住: { bg: "#d1d4d8", fg: "#2f3d4f" },
-    日用: { bg: "#d8ead3", fg: "#5f8f5f" },
-    医疗: { bg: "#f2d4da", fg: "#c24b5a" },
-    娱乐: { bg: "#e3d7f1", fg: "#8b68b8" },
-    其他: { bg: "#d5d8dd", fg: "#455160" },
+function getCategoryMeta(transaction: Transaction, categories: ReturnType<typeof useCategories>) {
+  const matched = categories.find((category) => category.name === transaction.category && category.type === transaction.type);
+  return {
+    color: matched?.color || (transaction.type === "income" ? "#2f7d62" : "#6f7680"),
+    icon: matched?.icon || "wallet",
   };
-  return map[category] ?? map["其他"];
+}
+
+function softColor(hex: string) {
+  const normalized = hex.replace("#", "");
+  if (normalized.length !== 6) return "#eef0e7";
+  const red = parseInt(normalized.slice(0, 2), 16);
+  const green = parseInt(normalized.slice(2, 4), 16);
+  const blue = parseInt(normalized.slice(4, 6), 16);
+  return `rgb(${Math.round(red + (255 - red) * 0.72)}, ${Math.round(green + (255 - green) * 0.72)}, ${Math.round(
+    blue + (255 - blue) * 0.72
+  )})`;
 }
 
 function AssetsView({ items, accounts }: { items: Transaction[]; accounts: Account[] }) {
@@ -824,11 +847,34 @@ function SettingsView({ categories }: { categories: ReturnType<typeof useCategor
           <h2>分类</h2>
           <span>{categories.length} 个</span>
         </div>
-        <div className="category-list">
+        <div className="category-editor-list">
           {categories.map((category) => (
-            <span key={`${category.type}-${category.name}`} style={{ "--swatch": category.color } as React.CSSProperties}>
-              {category.name}
-            </span>
+            <div className="category-editor-row" key={`${category.type}-${category.name}`}>
+              <div className="category-preview" style={{ "--swatch": category.color } as React.CSSProperties}>
+                <CategoryIcon icon={category.icon} />
+              </div>
+              <div>
+                <strong>{category.name}</strong>
+                <span>{typeLabel[category.type]}</span>
+              </div>
+              <input
+                aria-label={`${category.name}颜色`}
+                type="color"
+                value={category.color}
+                onChange={(event) => category.id && db.categories.update(category.id, { color: event.target.value })}
+              />
+              <select
+                aria-label={`${category.name}图标`}
+                value={category.icon || "wallet"}
+                onChange={(event) => category.id && db.categories.update(category.id, { icon: event.target.value })}
+              >
+                {categoryIconOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
           ))}
         </div>
       </div>

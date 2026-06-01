@@ -19,6 +19,7 @@ export type Category = {
   name: string;
   type: TransactionType;
   color: string;
+  icon?: string;
 };
 
 export type Account = {
@@ -47,24 +48,29 @@ class MoneyDb extends Dexie {
       categories: "++id, &[name+type], type",
       accounts: "++id, &name, createdAt",
     });
+    this.version(4).stores({
+      transactions: "++id, type, category, account, date, createdAt",
+      categories: "++id, &[name+type], type",
+      accounts: "++id, &name, createdAt",
+    });
   }
 }
 
 export const db = new MoneyDb();
 
 export const defaultCategories: Category[] = [
-  { name: "餐饮", type: "expense", color: "#d95f43" },
-  { name: "交通", type: "expense", color: "#4776b4" },
-  { name: "购物", type: "expense", color: "#b45f9d" },
-  { name: "居住", type: "expense", color: "#8c6b4f" },
-  { name: "日用", type: "expense", color: "#5f8f5f" },
-  { name: "医疗", type: "expense", color: "#c24b5a" },
-  { name: "娱乐", type: "expense", color: "#8b68b8" },
-  { name: "其他", type: "expense", color: "#6f7680" },
-  { name: "工资", type: "income", color: "#2f7d62" },
-  { name: "奖金", type: "income", color: "#c28a2c" },
-  { name: "兼职", type: "income", color: "#3d8b93" },
-  { name: "其他", type: "income", color: "#6f7680" },
+  { name: "餐饮", type: "expense", color: "#d95f43", icon: "food" },
+  { name: "交通", type: "expense", color: "#4776b4", icon: "bus" },
+  { name: "购物", type: "expense", color: "#3a8d8f", icon: "shopping" },
+  { name: "居住", type: "expense", color: "#2f3d4f", icon: "home" },
+  { name: "日用", type: "expense", color: "#5f8f5f", icon: "daily" },
+  { name: "医疗", type: "expense", color: "#c24b5a", icon: "health" },
+  { name: "娱乐", type: "expense", color: "#8b68b8", icon: "game" },
+  { name: "其他", type: "expense", color: "#6f7680", icon: "wallet" },
+  { name: "工资", type: "income", color: "#2f7d62", icon: "money" },
+  { name: "奖金", type: "income", color: "#c28a2c", icon: "piggy" },
+  { name: "兼职", type: "income", color: "#3d8b93", icon: "wallet" },
+  { name: "其他", type: "income", color: "#6f7680", icon: "wallet" },
 ];
 
 export const defaultAccounts = ["现金", "微信", "支付宝", "银行卡"];
@@ -74,6 +80,15 @@ export async function seedCategories() {
   if (count === 0) {
     await db.categories.bulkAdd(defaultCategories);
   }
+  const categories = await db.categories.toArray();
+  await Promise.all(
+    categories.map((category) => {
+      if (category.icon) return Promise.resolve();
+      const defaultCategory = defaultCategories.find((item) => item.name === category.name && item.type === category.type);
+      if (!defaultCategory) return Promise.resolve();
+      return db.categories.update(category.id!, { icon: defaultCategory.icon, color: category.color || defaultCategory.color });
+    })
+  );
   const accountCount = await db.accounts.count();
   if (accountCount === 0) {
     const now = new Date().toISOString();
