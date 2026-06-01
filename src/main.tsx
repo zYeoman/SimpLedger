@@ -239,6 +239,10 @@ function EntryForm({ categories, accounts, onDone }: { categories: ReturnType<ty
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
+    if (/[+-]/.test(amount)) {
+      calculateAmountInPlace();
+      return;
+    }
     const value = evaluateAmountExpression(amount);
     if (!value || value <= 0 || !category) return;
     const now = new Date().toISOString();
