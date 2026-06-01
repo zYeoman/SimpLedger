@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { useLiveQuery } from "dexie-react-hooks";
-import { Button, DatePicker, Picker, TabBar } from "antd-mobile";
+import { Button, DatePicker, Picker, Popup, TabBar } from "antd-mobile";
 import "antd-mobile/bundle/style.css";
 import {
   ArrowDownCircle,
@@ -924,7 +924,7 @@ function SettingsView({ categories, transactions }: { categories: ReturnType<typ
             <option value="income">收入</option>
           </select>
           <input aria-label="分类颜色" type="color" value={newCategoryColor} onChange={(event) => setNewCategoryColor(event.target.value)} />
-          <IconPicker value={newCategoryIcon} onChange={setNewCategoryIcon} />
+          <IconPicker value={newCategoryIcon} color={newCategoryColor} onChange={setNewCategoryIcon} />
           <button type="submit">添加</button>
         </form>
         <div className="category-editor-list">
@@ -932,9 +932,11 @@ function SettingsView({ categories, transactions }: { categories: ReturnType<typ
             const usageCount = transactions.filter((item) => item.category === category.name && item.type === category.type).length;
             return (
               <div className="category-editor-row" key={`${category.type}-${category.name}`}>
-                <div className="category-preview" style={{ "--swatch": category.color } as React.CSSProperties}>
-                  <CategoryIcon icon={category.icon} />
-                </div>
+                <IconPicker
+                  value={category.icon || "wallet"}
+                  color={category.color}
+                  onChange={(icon) => category.id && db.categories.update(category.id, { icon })}
+                />
                 <div>
                   <strong>{category.name}</strong>
                   <span>
@@ -954,10 +956,6 @@ function SettingsView({ categories, transactions }: { categories: ReturnType<typ
                 >
                   删除
                 </button>
-                <IconPicker
-                  value={category.icon || "wallet"}
-                  onChange={(icon) => category.id && db.categories.update(category.id, { icon })}
-                />
               </div>
             );
           })}
@@ -967,22 +965,42 @@ function SettingsView({ categories, transactions }: { categories: ReturnType<typ
   );
 }
 
-function IconPicker({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+function IconPicker({ value, color, onChange }: { value: string; color: string; onChange: (value: string) => void }) {
+  const [visible, setVisible] = useState(false);
+
   return (
-    <div className="icon-picker">
-      {categoryIconOptions.map((option) => (
-        <button
-          type="button"
-          key={option.value}
-          className={value === option.value ? "selected" : ""}
-          title={option.label}
-          aria-label={option.label}
-          onClick={() => onChange(option.value)}
-        >
-          <CategoryIcon icon={option.value} />
-        </button>
-      ))}
-    </div>
+    <>
+      <button
+        type="button"
+        className="icon-picker-trigger"
+        aria-label="选择图标"
+        style={{ "--swatch": color } as React.CSSProperties}
+        onClick={() => setVisible(true)}
+      >
+        <CategoryIcon icon={value} />
+      </button>
+      <Popup visible={visible} onMaskClick={() => setVisible(false)} bodyClassName="icon-picker-popup">
+        <div className="popup-title">选择图标</div>
+        <div className="icon-picker-panel">
+          {categoryIconOptions.map((option) => (
+            <button
+              type="button"
+              key={option.value}
+              className={value === option.value ? "selected" : ""}
+              title={option.label}
+              aria-label={option.label}
+              onClick={() => {
+                onChange(option.value);
+                setVisible(false);
+              }}
+            >
+              <CategoryIcon icon={option.value} />
+              <span>{option.label}</span>
+            </button>
+          ))}
+        </div>
+      </Popup>
+    </>
   );
 }
 

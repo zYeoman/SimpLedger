@@ -892,34 +892,74 @@ h1 {
   font-weight: 800;
 }
 
-.icon-picker {
-  grid-column: 1 / -1;
-  display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  gap: 6px;
-}
-
-.icon-picker button {
+.icon-picker-trigger {
   display: grid;
   place-items: center;
+  width: 40px;
+  min-width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--swatch);
+  color: #fff;
+  padding: 0;
+}
+
+.icon-picker-trigger svg {
+  width: 18px;
+  height: 18px;
+}
+
+.icon-picker-popup {
+  border-radius: 16px 16px 0 0;
+  padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+}
+
+.popup-title {
+  margin-bottom: 12px;
+  color: #27322f;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.icon-picker-panel {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+
+.icon-picker-panel button {
+  display: grid;
+  place-items: center;
+  gap: 5px;
   min-width: 0;
-  height: 34px;
+  min-height: 64px;
   border: 1px solid #e6ded1;
   border-radius: 8px;
   background: #fffaf2;
   color: #4d5753;
-  padding: 0;
+  padding: 6px 4px;
 }
 
-.icon-picker button.selected {
+.icon-picker-panel button.selected {
   border-color: #2f6f5e;
   background: #e8f0e8;
   color: #2f6f5e;
 }
 
-.icon-picker svg {
+.icon-picker-panel svg {
   width: 18px;
   height: 18px;
+}
+
+.icon-picker-panel span {
+  max-width: 100%;
+  overflow: hidden;
+  color: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .asset-summary {
@@ -1068,8 +1108,8 @@ h1 {
     grid-template-columns: 1fr 72px;
   }
 
-  .icon-picker {
-    grid-template-columns: repeat(6, 1fr);
+  .icon-picker-panel {
+    grid-template-columns: repeat(4, 1fr);
   }
 
   .summary-band strong {
