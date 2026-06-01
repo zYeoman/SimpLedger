@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { useLiveQuery } from "dexie-react-hooks";
+import { Button, DatePicker, Picker, TabBar } from "antd-mobile";
+import "antd-mobile/bundle/style.css";
 import {
   ArrowDownCircle,
   ArrowUpCircle,
@@ -108,13 +110,15 @@ function App() {
       )}
 
       <nav className="bottom-nav">
-        <NavButton active={view === "home"} icon={<Home size={20} />} label="首页" onClick={() => setView("home")} />
-        <NavButton active={view === "assets"} icon={<Wallet size={20} />} label="资产" onClick={() => setView("assets")} />
+        <TabBar className="main-tabbar" activeKey={view} onChange={(key) => setView(key as View)}>
+          <TabBar.Item key="home" icon={<Home size={20} />} title="首页" />
+          <TabBar.Item key="assets" icon={<Wallet size={20} />} title="资产" />
+          <TabBar.Item key="stats" icon={<BarChart3 size={20} />} title="统计" />
+          <TabBar.Item key="settings" icon={<Settings size={20} />} title="设置" />
+        </TabBar>
         <button className="add-fab" aria-label="记一笔" onClick={openEntryPage}>
           <Plus size={26} />
         </button>
-        <NavButton active={view === "stats"} icon={<BarChart3 size={20} />} label="统计" onClick={() => setView("stats")} />
-        <NavButton active={view === "settings"} icon={<Settings size={20} />} label="设置" onClick={() => setView("settings")} />
       </nav>
     </main>
   );
@@ -154,15 +158,6 @@ function titleForView(view: View) {
     stats: "分类统计",
     settings: "数据设置",
   }[view];
-}
-
-function NavButton(props: { active: boolean; icon: React.ReactNode; label: string; onClick: () => void }) {
-  return (
-    <button className={`nav-button ${props.active ? "active" : ""}`} onClick={props.onClick}>
-      {props.icon}
-      <span>{props.label}</span>
-    </button>
-  );
 }
 
 function HomeView({
@@ -233,8 +228,6 @@ function EntryForm({ categories, accounts, onDone }: { categories: ReturnType<ty
   const [account, setAccount] = useState(accountNames[0]);
   const [date, setDate] = useState(todayInputValue());
   const [note, setNote] = useState("");
-  const [isAccountPickerOpen, setIsAccountPickerOpen] = useState(false);
-  const dateInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setCategory(typeCategories[0]?.name ?? "");
@@ -293,17 +286,9 @@ function EntryForm({ categories, accounts, onDone }: { categories: ReturnType<ty
     }
   }
 
-  function openDatePicker() {
-    const input = dateInputRef.current as (HTMLInputElement & { showPicker?: () => void }) | null;
-    if (!input) return;
-    if (input.showPicker) {
-      input.showPicker();
-      return;
-    }
-    input.click();
-  }
-
   const dateLabel = date === todayInputValue() ? "今天" : date;
+  const dateValue = new Date(`${date}T00:00:00`);
+  const accountColumns = [accountNames.map((item) => ({ label: item, value: item }))];
 
   return (
     <form className="entry-form" onSubmit={submit} onKeyDown={preventKeyboardSubmit}>
@@ -335,42 +320,25 @@ function EntryForm({ categories, accounts, onDone }: { categories: ReturnType<ty
         <div className="entry-meta-grid">
           <div className="meta-left">
             <div className="choice-wrap">
-              <button type="button" className="choice-button" onClick={openDatePicker}>
-                <CalendarDays size={18} />
-                {dateLabel}
-              </button>
-              <input
-                ref={dateInputRef}
-                className="hidden-date-input"
-                tabIndex={-1}
-                type="date"
-                value={date}
-                onChange={(event) => setDate(event.target.value)}
-              />
+              <DatePicker title="选择日期" value={dateValue} onConfirm={(value) => setDate(toDateInputValue(value))}>
+                {(_, actions) => (
+                  <Button className="choice-button" fill="outline" shape="rectangular" onClick={actions.open}>
+                    <CalendarDays size={18} />
+                    {dateLabel}
+                  </Button>
+                )}
+              </DatePicker>
             </div>
             <div className="choice-wrap">
-              <button type="button" className="choice-button" onClick={() => setIsAccountPickerOpen((open) => !open)}>
-                <Wallet size={18} />
-                {account}
-                <ChevronDown size={16} />
-              </button>
-              {isAccountPickerOpen && (
-                <div className="account-picker">
-                  {accountNames.map((item) => (
-                    <button
-                      type="button"
-                      key={item}
-                      className={account === item ? "selected" : ""}
-                      onClick={() => {
-                        setAccount(item);
-                        setIsAccountPickerOpen(false);
-                      }}
-                    >
-                      {item}
-                    </button>
-                  ))}
-                </div>
-              )}
+              <Picker columns={accountColumns} value={[account]} onConfirm={(value) => setAccount(String(value[0]))}>
+                {(_, actions) => (
+                  <Button className="choice-button" fill="outline" shape="rectangular" onClick={actions.open}>
+                    <Wallet size={18} />
+                    {account}
+                    <ChevronDown size={16} />
+                  </Button>
+                )}
+              </Picker>
             </div>
           </div>
           <label className="field note-field">
@@ -394,12 +362,19 @@ function EntryForm({ categories, accounts, onDone }: { categories: ReturnType<ty
             清空
           </button>
         </div>
-        <button className="primary-button" type="submit">
+        <Button className="primary-button" color="primary" block type="submit">
           保存
-        </button>
+        </Button>
       </div>
     </form>
   );
+}
+
+function toDateInputValue(value: Date) {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function useCategories() {
