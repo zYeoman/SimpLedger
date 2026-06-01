@@ -385,54 +385,8 @@ h1 {
   font-weight: 800;
 }
 
-.choice-button .adm-button-content {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-}
-
-.choice-button svg:last-child,
-.choice-button .adm-button-content svg:last-child {
+.choice-button svg:last-child {
   margin-left: auto;
-}
-
-.hidden-date-input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.account-picker {
-  position: absolute;
-  right: 0;
-  bottom: calc(100% + 8px);
-  left: 0;
-  z-index: 3;
-  display: grid;
-  gap: 6px;
-  border: 1px solid #e6ded1;
-  border-radius: 8px;
-  background: #fffaf2;
-  padding: 8px;
-  box-shadow: 0 10px 24px rgba(64, 51, 37, 0.12);
-}
-
-.account-picker button {
-  min-height: 36px;
-  border-radius: 6px;
-  background: transparent;
-  color: #27322f;
-  font-weight: 800;
-  text-align: left;
-  padding: 0 10px;
-}
-
-.account-picker .selected {
-  background: #2f6f5e;
-  color: #fff;
 }
 
 .note-field {

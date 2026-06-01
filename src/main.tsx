@@ -322,21 +322,21 @@ function EntryForm({ categories, accounts, onDone }: { categories: ReturnType<ty
             <div className="choice-wrap">
               <DatePicker title="选择日期" value={dateValue} onConfirm={(value) => setDate(toDateInputValue(value))}>
                 {(_, actions) => (
-                  <Button className="choice-button" fill="outline" shape="rectangular" onClick={actions.open}>
+                  <button type="button" className="choice-button" onClick={actions.open}>
                     <CalendarDays size={18} />
                     {dateLabel}
-                  </Button>
+                  </button>
                 )}
               </DatePicker>
             </div>
             <div className="choice-wrap">
               <Picker columns={accountColumns} value={[account]} onConfirm={(value) => setAccount(String(value[0]))}>
                 {(_, actions) => (
-                  <Button className="choice-button" fill="outline" shape="rectangular" onClick={actions.open}>
+                  <button type="button" className="choice-button" onClick={actions.open}>
                     <Wallet size={18} />
                     {account}
                     <ChevronDown size={16} />
-                  </Button>
+                  </button>
                 )}
               </Picker>
             </div>
