@@ -365,7 +365,9 @@ function EntryForm({
             onClick={() => setCategory(item.name)}
             style={{ "--swatch": item.color } as React.CSSProperties}
           >
-            <span />
+            <span>
+              <CategoryIcon icon={item.icon} />
+            </span>
             {item.name}
           </button>
         ))}
@@ -805,6 +807,10 @@ function StatsView({ items, categories, month }: { items: Transaction[]; categor
 
 function SettingsView({ categories }: { categories: ReturnType<typeof useCategories> }) {
   const fileRef = useRef<HTMLInputElement>(null);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [newCategoryType, setNewCategoryType] = useState<TransactionType>("expense");
+  const [newCategoryColor, setNewCategoryColor] = useState("#6f7680");
+  const [newCategoryIcon, setNewCategoryIcon] = useState("wallet");
 
   async function downloadBackup() {
     const payload = await exportBackup();
@@ -822,6 +828,21 @@ function SettingsView({ categories }: { categories: ReturnType<typeof useCategor
     const payload = JSON.parse(await file.text()) as BackupPayload;
     await importBackup(payload);
     event.target.value = "";
+  }
+
+  async function addCategory(event: React.FormEvent) {
+    event.preventDefault();
+    const name = newCategoryName.trim();
+    if (!name) return;
+    const exists = categories.some((category) => category.name === name && category.type === newCategoryType);
+    if (exists) return;
+    await db.categories.add({
+      name,
+      type: newCategoryType,
+      color: newCategoryColor,
+      icon: newCategoryIcon,
+    });
+    setNewCategoryName("");
   }
 
   return (
@@ -847,6 +868,22 @@ function SettingsView({ categories }: { categories: ReturnType<typeof useCategor
           <h2>分类</h2>
           <span>{categories.length} 个</span>
         </div>
+        <form className="category-add-form" onSubmit={addCategory}>
+          <input placeholder="新增分类" value={newCategoryName} onChange={(event) => setNewCategoryName(event.target.value)} />
+          <select value={newCategoryType} onChange={(event) => setNewCategoryType(event.target.value as TransactionType)}>
+            <option value="expense">支出</option>
+            <option value="income">收入</option>
+          </select>
+          <input aria-label="分类颜色" type="color" value={newCategoryColor} onChange={(event) => setNewCategoryColor(event.target.value)} />
+          <select value={newCategoryIcon} onChange={(event) => setNewCategoryIcon(event.target.value)}>
+            {categoryIconOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <button type="submit">添加</button>
+        </form>
         <div className="category-editor-list">
           {categories.map((category) => (
             <div className="category-editor-row" key={`${category.type}-${category.name}`}>
