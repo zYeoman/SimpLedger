@@ -905,12 +905,28 @@ h1 {
   padding: 0;
 }
 
+.color-picker-trigger {
+  width: 40px;
+  min-width: 40px;
+  height: 40px;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  background: var(--swatch);
+  box-shadow: 0 0 0 1px #e6ded1;
+  padding: 0;
+}
+
 .icon-picker-trigger svg {
   width: 18px;
   height: 18px;
 }
 
 .icon-picker-popup {
+  border-radius: 16px 16px 0 0;
+  padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+}
+
+.color-picker-popup {
   border-radius: 16px 16px 0 0;
   padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
 }
@@ -960,6 +976,49 @@ h1 {
   font-weight: 800;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.color-picker-panel {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.color-picker-panel button {
+  width: 100%;
+  aspect-ratio: 1;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  background: var(--swatch);
+  box-shadow: 0 0 0 1px #e6ded1;
+  padding: 0;
+}
+
+.color-picker-panel button.selected {
+  box-shadow: 0 0 0 3px #2f6f5e;
+}
+
+.custom-color-field {
+  display: grid;
+  grid-template-columns: auto 44px;
+  gap: 12px;
+  align-items: center;
+  border-top: 1px solid #eee7dc;
+  padding-top: 12px;
+}
+
+.custom-color-field span {
+  color: #27322f;
+  font-weight: 800;
+}
+
+.custom-color-field input {
+  width: 44px;
+  height: 36px;
+  border: 0;
+  background: transparent;
+  padding: 0;
 }
 
 .asset-summary {
@@ -1110,6 +1169,10 @@ h1 {
 
   .icon-picker-panel {
     grid-template-columns: repeat(4, 1fr);
+  }
+
+  .color-picker-panel {
+    grid-template-columns: repeat(5, 1fr);
   }
 
   .summary-band strong {

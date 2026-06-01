@@ -681,6 +681,23 @@ const categoryIconOptions = [
   { value: "wallet", label: "钱包" },
 ];
 
+const categoryColorOptions = [
+  "#d95f43",
+  "#df5750",
+  "#c24b5a",
+  "#c28a2c",
+  "#5f8f5f",
+  "#2f7d62",
+  "#3d8b93",
+  "#3a8d8f",
+  "#4776b4",
+  "#8b68b8",
+  "#b45f9d",
+  "#8c6b4f",
+  "#455160",
+  "#6f7680",
+];
+
 function CategoryIcon({ icon }: { icon?: string }) {
   const props = { size: 26, strokeWidth: 2.8 };
   if (icon === "food") return <Utensils {...props} />;
@@ -923,7 +940,7 @@ function SettingsView({ categories, transactions }: { categories: ReturnType<typ
             <option value="expense">支出</option>
             <option value="income">收入</option>
           </select>
-          <input aria-label="分类颜色" type="color" value={newCategoryColor} onChange={(event) => setNewCategoryColor(event.target.value)} />
+          <ColorPicker value={newCategoryColor} onChange={setNewCategoryColor} />
           <IconPicker value={newCategoryIcon} color={newCategoryColor} onChange={setNewCategoryIcon} />
           <button type="submit">添加</button>
         </form>
@@ -943,11 +960,9 @@ function SettingsView({ categories, transactions }: { categories: ReturnType<typ
                     {typeLabel[category.type]} · {usageCount} 笔
                   </span>
                 </div>
-                <input
-                  aria-label={`${category.name}颜色`}
-                  type="color"
+                <ColorPicker
                   value={category.color}
-                  onChange={(event) => category.id && db.categories.update(category.id, { color: event.target.value })}
+                  onChange={(color) => category.id && db.categories.update(category.id, { color })}
                 />
                 <button
                   type="button"
@@ -999,6 +1014,44 @@ function IconPicker({ value, color, onChange }: { value: string; color: string; 
             </button>
           ))}
         </div>
+      </Popup>
+    </>
+  );
+}
+
+function ColorPicker({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const [visible, setVisible] = useState(false);
+
+  return (
+    <>
+      <button
+        type="button"
+        className="color-picker-trigger"
+        aria-label="选择颜色"
+        style={{ "--swatch": value } as React.CSSProperties}
+        onClick={() => setVisible(true)}
+      />
+      <Popup visible={visible} onMaskClick={() => setVisible(false)} bodyClassName="color-picker-popup">
+        <div className="popup-title">选择颜色</div>
+        <div className="color-picker-panel">
+          {categoryColorOptions.map((color) => (
+            <button
+              type="button"
+              key={color}
+              className={value.toLowerCase() === color.toLowerCase() ? "selected" : ""}
+              aria-label={color}
+              style={{ "--swatch": color } as React.CSSProperties}
+              onClick={() => {
+                onChange(color);
+                setVisible(false);
+              }}
+            />
+          ))}
+        </div>
+        <label className="custom-color-field">
+          <span>自定义</span>
+          <input type="color" value={value} onChange={(event) => onChange(event.target.value)} />
+        </label>
       </Popup>
     </>
   );
