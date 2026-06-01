@@ -690,11 +690,10 @@ h1 {
 .add-fab {
   display: grid;
   place-items: center;
-  position: absolute;
-  left: 50%;
-  top: -24px;
-  transform: translateX(-50%);
-  align-self: center;
+  position: fixed;
+  right: max(18px, calc((100vw - 520px) / 2 + 18px));
+  bottom: calc(96px + env(safe-area-inset-bottom));
+  z-index: 30;
   width: 58px;
   height: 58px;
   border-radius: 50%;
