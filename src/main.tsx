@@ -399,14 +399,24 @@ function EntryForm({ categories, accounts, onDone }: { categories: ReturnType<ty
           <button type="button" className="clear-key" onClick={() => pressAmountKey("clear")}>
             清空
           </button>
-          <button
-            type={hasAmountExpression ? "button" : "submit"}
-            className="confirm-key"
-            aria-label={hasAmountExpression ? "计算" : "提交"}
-            onClick={hasAmountExpression ? calculateAmountInPlace : undefined}
-          >
-            {hasAmountExpression ? "=" : "✓"}
-          </button>
+          {hasAmountExpression ? (
+            <button
+              type="button"
+              className="confirm-key"
+              aria-label="计算"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                calculateAmountInPlace();
+              }}
+            >
+              =
+            </button>
+          ) : (
+            <button type="submit" className="confirm-key" aria-label="提交">
+              ✓
+            </button>
+          )}
         </div>
       </div>
     </form>
