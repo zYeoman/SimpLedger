@@ -387,7 +387,7 @@ h1 {
 
 .number-pad {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 8px;
 }
 
@@ -401,12 +401,22 @@ h1 {
   font-weight: 800;
 }
 
+.number-pad .operator-key {
+  background: #eef0e7;
+  color: #2f6f5e;
+}
+
 .number-pad .clear-key {
-  grid-column: 1 / -1;
-  min-height: 42px;
   background: #eee7dc;
   color: #6b4d42;
   font-size: 15px;
+}
+
+.number-pad .confirm-key {
+  background: #2f6f5e;
+  color: #fff;
+  border-color: #2f6f5e;
+  font-size: 24px;
 }
 
 .category-grid {

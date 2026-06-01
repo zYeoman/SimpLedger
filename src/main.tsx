@@ -239,7 +239,7 @@ function EntryForm({ categories, accounts, onDone }: { categories: ReturnType<ty
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
-    const value = Number(amount);
+    const value = evaluateAmountExpression(amount);
     if (!value || value <= 0 || !category) return;
     const now = new Date().toISOString();
     await db.transactions.add({
@@ -265,14 +265,23 @@ function EntryForm({ categories, accounts, onDone }: { categories: ReturnType<ty
       if (key === "clear") {
         return "";
       }
-      if (key === ".") {
-        return current.includes(".") ? current : `${current || "0"}.`;
+      if (key === "+" || key === "-") {
+        if (!current) return "";
+        if (/[+-]$/.test(current)) return `${current.slice(0, -1)}${key}`;
+        return `${current}${key}`;
       }
-      if (current.includes(".") && current.split(".")[1].length >= 2) {
+      if (key === ".") {
+        const segments = current.split(/[+-]/);
+        const segment = segments[segments.length - 1] ?? "";
+        return segment.includes(".") ? current : `${current || "0"}.`;
+      }
+      const segments = current.split(/[+-]/);
+      const segment = segments[segments.length - 1] ?? "";
+      if (segment.includes(".") && segment.split(".")[1].length >= 2) {
         return current;
       }
-      if (current === "0" && key !== ".") {
-        return key;
+      if (segment === "0" && key !== ".") {
+        return `${current.slice(0, -1)}${key}`;
       }
       return `${current}${key}`;
     });
@@ -287,6 +296,14 @@ function EntryForm({ categories, accounts, onDone }: { categories: ReturnType<ty
   const dateLabel = formatEntryDateLabel(date);
   const dateValue = new Date(`${date}T00:00:00`);
   const accountColumns = [accountNames.map((item) => ({ label: item, value: item }))];
+  const hasAmountExpression = /[+-]/.test(amount);
+
+  function calculateAmountInPlace() {
+    const value = evaluateAmountExpression(amount);
+    if (value > 0) {
+      setAmount(String(value));
+    }
+  }
 
   return (
     <form className="entry-form" onSubmit={submit} onKeyDown={preventKeyboardSubmit}>
@@ -320,7 +337,7 @@ function EntryForm({ categories, accounts, onDone }: { categories: ReturnType<ty
             <div className="choice-wrap">
               <DatePicker title="选择日期" value={dateValue} onConfirm={(value) => setDate(toDateInputValue(value))}>
                 {(_, actions) => (
-                  <Button className="choice-button" color="primary" fill="solid" shape="rectangular" onClick={actions.open}>
+                  <Button className="choice-button" color="primary" fill="solid" onClick={actions.open}>
                     {dateLabel}
                   </Button>
                 )}
@@ -329,7 +346,7 @@ function EntryForm({ categories, accounts, onDone }: { categories: ReturnType<ty
             <div className="choice-wrap">
               <Picker columns={accountColumns} value={[account]} onConfirm={(value) => setAccount(String(value[0]))}>
                 {(_, actions) => (
-                  <Button className="choice-button" color="primary" fill="solid" shape="rectangular" onClick={actions.open}>
+                  <Button className="choice-button" color="primary" fill="solid" onClick={actions.open}>
                     {account}
                   </Button>
                 )}
@@ -345,24 +362,63 @@ function EntryForm({ categories, accounts, onDone }: { categories: ReturnType<ty
           <output>{amount || "0.00"}</output>
         </label>
         <div className="number-pad" aria-label="金额数字键盘">
-          {["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0"].map((key) => (
+          {["1", "2", "3"].map((key) => (
             <button type="button" key={key} onClick={() => pressAmountKey(key)}>
               {key}
             </button>
           ))}
-          <button type="button" onClick={() => pressAmountKey("backspace")}>
-            退格
+          <button type="button" className="operator-key" onClick={() => pressAmountKey("+")}>
+            +
+          </button>
+          {["4", "5", "6"].map((key) => (
+            <button type="button" key={key} onClick={() => pressAmountKey(key)}>
+              {key}
+            </button>
+          ))}
+          <button type="button" className="operator-key" onClick={() => pressAmountKey("-")}>
+            -
+          </button>
+          {["7", "8", "9"].map((key) => (
+            <button type="button" key={key} onClick={() => pressAmountKey(key)}>
+              {key}
+            </button>
+          ))}
+          <button type="button" className="operator-key" onClick={() => pressAmountKey("backspace")} aria-label="退格">
+            ⌫
+          </button>
+          <button type="button" onClick={() => pressAmountKey(".")}>
+            .
+          </button>
+          <button type="button" onClick={() => pressAmountKey("0")}>
+            0
           </button>
           <button type="button" className="clear-key" onClick={() => pressAmountKey("clear")}>
             清空
           </button>
+          <button
+            type={hasAmountExpression ? "button" : "submit"}
+            className="confirm-key"
+            aria-label={hasAmountExpression ? "计算" : "提交"}
+            onClick={hasAmountExpression ? calculateAmountInPlace : undefined}
+          >
+            {hasAmountExpression ? "=" : "✓"}
+          </button>
         </div>
-        <Button className="primary-button" color="primary" block type="submit">
-          保存
-        </Button>
       </div>
     </form>
   );
+}
+
+function evaluateAmountExpression(expression: string) {
+  if (!expression || /[+-]$/.test(expression)) return 0;
+  const parts = expression.match(/[+-]?[^+-]+/g);
+  if (!parts) return 0;
+  const total = parts.reduce((sum, part) => {
+    const value = Number(part);
+    if (!Number.isFinite(value)) return NaN;
+    return sum + value;
+  }, 0);
+  return Number.isFinite(total) ? Math.round(total * 100) / 100 : 0;
 }
 
 function toDateInputValue(value: Date) {
