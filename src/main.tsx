@@ -5,6 +5,8 @@ import {
   ArrowDownCircle,
   ArrowUpCircle,
   BarChart3,
+  CalendarDays,
+  ChevronDown,
   Download,
   Home,
   Plus,
@@ -231,6 +233,8 @@ function EntryForm({ categories, accounts, onDone }: { categories: ReturnType<ty
   const [account, setAccount] = useState(accountNames[0]);
   const [date, setDate] = useState(todayInputValue());
   const [note, setNote] = useState("");
+  const [isAccountPickerOpen, setIsAccountPickerOpen] = useState(false);
+  const dateInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setCategory(typeCategories[0]?.name ?? "");
@@ -289,6 +293,18 @@ function EntryForm({ categories, accounts, onDone }: { categories: ReturnType<ty
     }
   }
 
+  function openDatePicker() {
+    const input = dateInputRef.current as (HTMLInputElement & { showPicker?: () => void }) | null;
+    if (!input) return;
+    if (input.showPicker) {
+      input.showPicker();
+      return;
+    }
+    input.click();
+  }
+
+  const dateLabel = date === todayInputValue() ? "今天" : date;
+
   return (
     <form className="entry-form" onSubmit={submit} onKeyDown={preventKeyboardSubmit}>
       <div className="segmented">
@@ -318,22 +334,47 @@ function EntryForm({ categories, accounts, onDone }: { categories: ReturnType<ty
       <div className="entry-bottom">
         <div className="entry-meta-grid">
           <div className="meta-left">
-            <label className="field compact-field">
-              <span>日期</span>
-              <input type="date" value={date} onChange={(event) => setDate(event.target.value)} />
-            </label>
-            <label className="field compact-field">
-              <span>账户</span>
-              <select value={account} onChange={(event) => setAccount(event.target.value)}>
-                {accountNames.map((item) => (
-                  <option key={item}>{item}</option>
-                ))}
-              </select>
-            </label>
+            <div className="choice-wrap">
+              <button type="button" className="choice-button" onClick={openDatePicker}>
+                <CalendarDays size={18} />
+                {dateLabel}
+              </button>
+              <input
+                ref={dateInputRef}
+                className="hidden-date-input"
+                tabIndex={-1}
+                type="date"
+                value={date}
+                onChange={(event) => setDate(event.target.value)}
+              />
+            </div>
+            <div className="choice-wrap">
+              <button type="button" className="choice-button" onClick={() => setIsAccountPickerOpen((open) => !open)}>
+                <Wallet size={18} />
+                {account}
+                <ChevronDown size={16} />
+              </button>
+              {isAccountPickerOpen && (
+                <div className="account-picker">
+                  {accountNames.map((item) => (
+                    <button
+                      type="button"
+                      key={item}
+                      className={account === item ? "selected" : ""}
+                      onClick={() => {
+                        setAccount(item);
+                        setIsAccountPickerOpen(false);
+                      }}
+                    >
+                      {item}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
           <label className="field note-field">
-            <span>备注</span>
-            <input placeholder="可选" value={note} onChange={(event) => setNote(event.target.value)} />
+            <input placeholder="备注" value={note} onChange={(event) => setNote(event.target.value)} />
           </label>
         </div>
         <label className="field amount-field">
