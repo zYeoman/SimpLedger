@@ -7,12 +7,21 @@ import {
   ArrowDownCircle,
   ArrowUpCircle,
   BarChart3,
+  Bus,
+  CircleDollarSign,
   Download,
+  Gamepad2,
+  HeartPulse,
   Home,
+  House,
+  PiggyBank,
   Plus,
   Settings,
+  ShoppingBag,
   Upload,
+  Utensils,
   Wallet,
+  Zap,
 } from "lucide-react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { db, defaultAccounts, exportBackup, importBackup, seedCategories, type Account, type BackupPayload, type Transaction, type TransactionType } from "./db";
@@ -510,17 +519,31 @@ function TransactionList({
       <div className="transaction-list">
         {Object.entries(groups).map(([date, records]) => (
           <div className="day-group" key={date}>
-            {!compact && <h3>{shortDate.format(new Date(date))}</h3>}
+            {!compact && <DateHeader date={date} records={records} />}
             {records.map((item) => (
-              <article key={item.id} className="transaction-row clickable" onClick={() => selectItem(item)}>
-                <div className={`type-dot ${item.type}`} />
-                <div className="row-main">
-                  <strong>{item.category}</strong>
-                  <span>{[item.account, item.note || typeLabel[item.type]].filter(Boolean).join(" · ")}</span>
-                </div>
-                <div className={`row-amount ${item.type}`}>
-                  {item.type === "expense" ? "-" : "+"}
-                  {currency.format(item.amount)}
+              <article key={item.id} className="transaction-row clickable timeline-row" onClick={() => selectItem(item)}>
+                <time>{formatRecordTime(item)}</time>
+                <div className="timeline-dot" />
+                <div
+                  className="transaction-pill"
+                  style={
+                    {
+                      "--row-bg": categoryTone(item.category, item.type).bg,
+                      "--row-fg": categoryTone(item.category, item.type).fg,
+                    } as React.CSSProperties
+                  }
+                >
+                  <div className="category-icon">
+                    <CategoryIcon category={item.category} type={item.type} />
+                  </div>
+                  <div className="row-main">
+                    <strong>{item.category}</strong>
+                    <span>{[item.account, item.note].filter(Boolean).join(" · ") || typeLabel[item.type]}</span>
+                  </div>
+                  <div className={`row-amount ${item.type}`}>
+                    {item.type === "expense" ? "-" : "+"}
+                    {currency.format(item.amount).replace("¥", "")}
+                  </div>
                 </div>
               </article>
             ))}
@@ -566,6 +589,71 @@ function TransactionList({
       )}
     </>
   );
+}
+
+function DateHeader({ date, records }: { date: string; records: Transaction[] }) {
+  const day = new Date(`${date}T00:00:00`);
+  const income = sumByType(records, "income");
+  const expense = sumByType(records, "expense");
+  const weekday = new Intl.DateTimeFormat("zh-CN", { weekday: "short" }).format(day);
+
+  return (
+    <div className="date-header">
+      <div>
+        <strong>{String(day.getDate()).padStart(2, "0")}</strong>
+        <span>/ {String(day.getMonth() + 1).padStart(2, "0")}</span>
+        <em>{weekday}</em>
+      </div>
+      <div>
+        <span>+{formatAmountPlain(income)}</span>
+        <span className="expense">-{formatAmountPlain(expense)}</span>
+      </div>
+    </div>
+  );
+}
+
+function formatRecordTime(item: Transaction) {
+  const source = item.createdAt || `${item.date}T00:00:00`;
+  return new Intl.DateTimeFormat("zh-CN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(source));
+}
+
+function formatAmountPlain(value: number) {
+  return new Intl.NumberFormat("zh-CN", {
+    minimumFractionDigits: value % 1 === 0 ? 0 : 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+function CategoryIcon({ category, type }: { category: string; type: TransactionType }) {
+  const props = { size: 26, strokeWidth: 2.8 };
+  if (type === "income") return category === "工资" ? <CircleDollarSign {...props} /> : <PiggyBank {...props} />;
+  if (category === "餐饮") return <Utensils {...props} />;
+  if (category === "交通") return <Bus {...props} />;
+  if (category === "购物") return <ShoppingBag {...props} />;
+  if (category === "居住") return <House {...props} />;
+  if (category === "医疗") return <HeartPulse {...props} />;
+  if (category === "娱乐") return <Gamepad2 {...props} />;
+  if (category === "日用") return <Zap {...props} />;
+  return <Wallet {...props} />;
+}
+
+function categoryTone(category: string, type: TransactionType) {
+  if (type === "income") return { bg: "#d9e7d6", fg: "#2f6f5e" };
+  const map: Record<string, { bg: string; fg: string }> = {
+    餐饮: { bg: "#f5caca", fg: "#df5750" },
+    购物: { bg: "#c7e1e2", fg: "#3a8d8f" },
+    交通: { bg: "#d9e2f2", fg: "#4776b4" },
+    居住: { bg: "#d1d4d8", fg: "#2f3d4f" },
+    日用: { bg: "#d8ead3", fg: "#5f8f5f" },
+    医疗: { bg: "#f2d4da", fg: "#c24b5a" },
+    娱乐: { bg: "#e3d7f1", fg: "#8b68b8" },
+    其他: { bg: "#d5d8dd", fg: "#455160" },
+  };
+  return map[category] ?? map["其他"];
 }
 
 function AssetsView({ items, accounts }: { items: Transaction[]; accounts: Account[] }) {

@@ -444,12 +444,12 @@ h1 {
 
 .transaction-list {
   display: grid;
-  gap: 12px;
+  gap: 22px;
 }
 
 .day-group {
   display: grid;
-  gap: 8px;
+  gap: 12px;
 }
 
 .day-group h3 {
@@ -458,12 +458,102 @@ h1 {
   font-weight: 700;
 }
 
+.date-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  border-left: 6px solid #df5750;
+  margin-left: -16px;
+  padding-left: 16px;
+}
+
+.date-header > div:first-child {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.date-header strong {
+  color: #343942;
+  font-size: 38px;
+  line-height: 1;
+}
+
+.date-header span {
+  color: #343942;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.date-header em {
+  border-radius: 6px;
+  background: #df5750;
+  color: #fff;
+  padding: 2px 7px;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 900;
+}
+
+.date-header > div:last-child {
+  display: flex;
+  gap: 10px;
+  white-space: nowrap;
+}
+
+.date-header .expense {
+  color: #df5750;
+}
+
 .transaction-row {
   display: grid;
   grid-template-columns: 10px minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 10px;
   min-height: 54px;
+}
+
+.transaction-row.timeline-row {
+  grid-template-columns: 48px 10px minmax(0, 1fr);
+  gap: 10px;
+  min-height: 80px;
+}
+
+.transaction-row.timeline-row time {
+  color: #343942;
+  font-size: 18px;
+  font-weight: 900;
+  text-align: right;
+}
+
+.timeline-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #f0f1f4;
+  box-shadow: 0 -38px 0 -4px #eef0f3;
+}
+
+.transaction-pill {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 76px;
+  border-radius: 999px;
+  background: var(--row-bg);
+  padding: 8px 16px 8px 8px;
+}
+
+.category-icon {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: var(--row-fg);
+  color: #fff;
 }
 
 .transaction-row.clickable {
@@ -500,13 +590,23 @@ h1 {
   white-space: nowrap;
 }
 
+.row-main strong {
+  color: #343942;
+  font-size: 20px;
+  font-weight: 950;
+}
+
 .row-main span {
-  margin-top: 2px;
-  color: #77807b;
-  font-size: 13px;
+  margin-top: 3px;
+  color: #343942;
+  font-size: 14px;
+  font-weight: 800;
+  opacity: 0.82;
 }
 
 .row-amount {
+  color: #343942;
+  font-size: 20px;
   font-weight: 800;
   white-space: nowrap;
 }
@@ -825,5 +925,43 @@ h1 {
 
   .row-amount {
     font-size: 14px;
+  }
+
+  .date-header strong {
+    font-size: 32px;
+  }
+
+  .date-header span {
+    font-size: 16px;
+  }
+
+  .transaction-row.timeline-row {
+    grid-template-columns: 42px 8px minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .transaction-row.timeline-row time {
+    font-size: 16px;
+  }
+
+  .transaction-pill {
+    grid-template-columns: 48px minmax(0, 1fr) auto;
+    gap: 8px;
+    min-height: 66px;
+    padding: 8px 12px 8px 8px;
+  }
+
+  .category-icon {
+    width: 48px;
+    height: 48px;
+  }
+
+  .row-main strong,
+  .row-amount {
+    font-size: 17px;
+  }
+
+  .row-main span {
+    font-size: 12px;
   }
 }
