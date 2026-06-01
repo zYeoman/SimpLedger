@@ -31,6 +31,8 @@ function App() {
   const [view, setView] = useState<View>("home");
   const [isEntryOpen, setIsEntryOpen] = useState(false);
   const [isEntryClosing, setIsEntryClosing] = useState(false);
+  const isEntryOpenRef = useRef(false);
+  const entryHistoryPushedRef = useRef(false);
   const [month, setMonth] = useState(monthKey());
   const categories = useLiveQuery(() => db.categories.orderBy("type").toArray(), [], []);
   const transactions = useLiveQuery(() => db.transactions.orderBy("date").reverse().toArray(), [], []);
@@ -40,6 +42,21 @@ function App() {
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/public-sw.js").catch(() => undefined);
     }
+  }, []);
+
+  useEffect(() => {
+    isEntryOpenRef.current = isEntryOpen;
+  }, [isEntryOpen]);
+
+  useEffect(() => {
+    function handlePopState() {
+      if (isEntryOpenRef.current) {
+        animateEntryClose();
+      }
+    }
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
   const monthItems = useMemo(() => {
@@ -89,15 +106,29 @@ function App() {
   );
 
   function openEntryPage() {
+    if (isEntryOpenRef.current) return;
+    window.history.pushState({ localMoneyEntry: true }, "", window.location.href);
+    entryHistoryPushedRef.current = true;
     setIsEntryClosing(false);
     setIsEntryOpen(true);
+    isEntryOpenRef.current = true;
   }
 
   function closeEntryPage() {
+    if (entryHistoryPushedRef.current) {
+      window.history.back();
+      return;
+    }
+    animateEntryClose();
+  }
+
+  function animateEntryClose() {
     setIsEntryClosing(true);
     window.setTimeout(() => {
       setIsEntryOpen(false);
       setIsEntryClosing(false);
+      isEntryOpenRef.current = false;
+      entryHistoryPushedRef.current = false;
     }, 220);
   }
 }
