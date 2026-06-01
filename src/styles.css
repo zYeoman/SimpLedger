@@ -342,15 +342,14 @@ h1 {
 
 .entry-meta-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(128px, 42%);
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 10px;
   align-items: stretch;
 }
 
 .meta-left {
-  display: grid;
-  grid-template-columns: minmax(82px, 0.8fr) minmax(96px, 1fr);
-  gap: 8px;
+  display: flex;
+  gap: 6px;
 }
 
 .compact-field {
@@ -370,15 +369,16 @@ h1 {
 }
 
 .choice-button {
-  width: 100%;
+  width: auto;
+  white-space: nowrap;
   min-height: 36px;
-  padding-inline: 10px;
-  font-size: 14px;
+  padding-inline: 8px;
+  font-size: 13px;
   font-weight: 800;
   --border-radius: 7px;
-  --border-color: #d9d9d9;
-  --text-color: #27322f;
-  --background-color: #fff;
+  --border-color: #2f6f5e;
+  --text-color: #fff;
+  --background-color: #2f6f5e;
 }
 
 .note-field {
@@ -710,11 +710,6 @@ h1 {
 
   .category-grid {
     grid-template-columns: repeat(3, 1fr);
-  }
-
-  .entry-meta-grid,
-  .meta-left {
-    grid-template-columns: 1fr;
   }
 
   .summary-band strong {

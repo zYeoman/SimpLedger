@@ -320,7 +320,7 @@ function EntryForm({ categories, accounts, onDone }: { categories: ReturnType<ty
             <div className="choice-wrap">
               <DatePicker title="选择日期" value={dateValue} onConfirm={(value) => setDate(toDateInputValue(value))}>
                 {(_, actions) => (
-                  <Button className="choice-button" fill="outline" shape="rectangular" onClick={actions.open}>
+                  <Button className="choice-button" color="primary" fill="solid" shape="rectangular" onClick={actions.open}>
                     {dateLabel}
                   </Button>
                 )}
@@ -329,7 +329,7 @@ function EntryForm({ categories, accounts, onDone }: { categories: ReturnType<ty
             <div className="choice-wrap">
               <Picker columns={accountColumns} value={[account]} onConfirm={(value) => setAccount(String(value[0]))}>
                 {(_, actions) => (
-                  <Button className="choice-button" fill="outline" shape="rectangular" onClick={actions.open}>
+                  <Button className="choice-button" color="primary" fill="solid" shape="rectangular" onClick={actions.open}>
                     {account}
                   </Button>
                 )}
