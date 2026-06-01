@@ -792,7 +792,7 @@ h1 {
 
 .category-add-form {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 72px 42px 92px auto;
+  grid-template-columns: minmax(0, 1fr) 72px 42px auto;
   gap: 8px;
   margin-bottom: 14px;
   align-items: center;
@@ -826,7 +826,7 @@ h1 {
 
 .category-editor-row {
   display: grid;
-  grid-template-columns: 42px minmax(0, 1fr) 42px 92px;
+  grid-template-columns: 42px minmax(0, 1fr) 42px auto;
   gap: 10px;
   align-items: center;
   border: 1px solid #e6ded1;
@@ -881,6 +881,45 @@ h1 {
   color: #27322f;
   padding: 8px 6px;
   font-weight: 700;
+}
+
+.category-delete {
+  min-height: 34px;
+  border-radius: 8px;
+  background: #f4e7e4;
+  color: #b84438;
+  padding: 0 10px;
+  font-weight: 800;
+}
+
+.icon-picker {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 6px;
+}
+
+.icon-picker button {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  height: 34px;
+  border: 1px solid #e6ded1;
+  border-radius: 8px;
+  background: #fffaf2;
+  color: #4d5753;
+  padding: 0;
+}
+
+.icon-picker button.selected {
+  border-color: #2f6f5e;
+  background: #e8f0e8;
+  color: #2f6f5e;
+}
+
+.icon-picker svg {
+  width: 18px;
+  height: 18px;
 }
 
 .asset-summary {
@@ -1029,10 +1068,8 @@ h1 {
     grid-template-columns: 1fr 72px;
   }
 
-  .category-add-form input[type="color"],
-  .category-add-form select:nth-of-type(2),
-  .category-add-form button {
-    grid-column: auto;
+  .icon-picker {
+    grid-template-columns: repeat(6, 1fr);
   }
 
   .summary-band strong {

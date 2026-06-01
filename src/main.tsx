@@ -7,20 +7,37 @@ import {
   ArrowDownCircle,
   ArrowUpCircle,
   BarChart3,
+  BookOpen,
+  BriefcaseBusiness,
   Bus,
+  Car,
   CircleDollarSign,
+  Coffee,
+  CreditCard,
+  Dumbbell,
   Download,
+  Film,
+  Fuel,
+  Gift,
+  GraduationCap,
   Gamepad2,
   HeartPulse,
   Home,
   House,
+  Landmark,
+  Music,
   PiggyBank,
+  Plane,
   Plus,
+  ReceiptText,
   Settings,
   ShoppingBag,
+  Shirt,
+  Smartphone,
   Upload,
   Utensils,
   Wallet,
+  Wrench,
   Zap,
 } from "lucide-react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
@@ -103,7 +120,7 @@ function App() {
         )}
         {view === "assets" && <AssetsView items={transactions} accounts={accounts} />}
         {view === "stats" && <StatsView items={monthItems} categories={categories} month={month} />}
-        {view === "settings" && <SettingsView categories={categories} />}
+        {view === "settings" && <SettingsView categories={categories} transactions={transactions} />}
       </section>
 
       {isEntryOpen && (
@@ -637,12 +654,28 @@ function formatAmountPlain(value: number) {
 
 const categoryIconOptions = [
   { value: "food", label: "餐饮" },
+  { value: "coffee", label: "咖啡" },
   { value: "bus", label: "交通" },
+  { value: "car", label: "汽车" },
+  { value: "fuel", label: "加油" },
+  { value: "plane", label: "出行" },
   { value: "shopping", label: "购物" },
+  { value: "shirt", label: "服饰" },
+  { value: "gift", label: "礼物" },
   { value: "home", label: "居住" },
   { value: "health", label: "医疗" },
+  { value: "fitness", label: "健身" },
   { value: "game", label: "娱乐" },
+  { value: "film", label: "电影" },
+  { value: "music", label: "音乐" },
   { value: "daily", label: "日用" },
+  { value: "phone", label: "数码" },
+  { value: "book", label: "学习" },
+  { value: "work", label: "工作" },
+  { value: "card", label: "卡片" },
+  { value: "bank", label: "银行" },
+  { value: "receipt", label: "票据" },
+  { value: "repair", label: "维修" },
   { value: "money", label: "钱币" },
   { value: "piggy", label: "储蓄" },
   { value: "wallet", label: "钱包" },
@@ -651,12 +684,28 @@ const categoryIconOptions = [
 function CategoryIcon({ icon }: { icon?: string }) {
   const props = { size: 26, strokeWidth: 2.8 };
   if (icon === "food") return <Utensils {...props} />;
+  if (icon === "coffee") return <Coffee {...props} />;
   if (icon === "bus") return <Bus {...props} />;
+  if (icon === "car") return <Car {...props} />;
+  if (icon === "fuel") return <Fuel {...props} />;
+  if (icon === "plane") return <Plane {...props} />;
   if (icon === "shopping") return <ShoppingBag {...props} />;
+  if (icon === "shirt") return <Shirt {...props} />;
+  if (icon === "gift") return <Gift {...props} />;
   if (icon === "home") return <House {...props} />;
   if (icon === "health") return <HeartPulse {...props} />;
+  if (icon === "fitness") return <Dumbbell {...props} />;
   if (icon === "game") return <Gamepad2 {...props} />;
+  if (icon === "film") return <Film {...props} />;
+  if (icon === "music") return <Music {...props} />;
   if (icon === "daily") return <Zap {...props} />;
+  if (icon === "phone") return <Smartphone {...props} />;
+  if (icon === "book") return <BookOpen {...props} />;
+  if (icon === "work") return <BriefcaseBusiness {...props} />;
+  if (icon === "card") return <CreditCard {...props} />;
+  if (icon === "bank") return <Landmark {...props} />;
+  if (icon === "receipt") return <ReceiptText {...props} />;
+  if (icon === "repair") return <Wrench {...props} />;
   if (icon === "money") return <CircleDollarSign {...props} />;
   if (icon === "piggy") return <PiggyBank {...props} />;
   return <Wallet {...props} />;
@@ -805,7 +854,7 @@ function StatsView({ items, categories, month }: { items: Transaction[]; categor
   );
 }
 
-function SettingsView({ categories }: { categories: ReturnType<typeof useCategories> }) {
+function SettingsView({ categories, transactions }: { categories: ReturnType<typeof useCategories>; transactions: Transaction[] }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [newCategoryType, setNewCategoryType] = useState<TransactionType>("expense");
@@ -875,47 +924,65 @@ function SettingsView({ categories }: { categories: ReturnType<typeof useCategor
             <option value="income">收入</option>
           </select>
           <input aria-label="分类颜色" type="color" value={newCategoryColor} onChange={(event) => setNewCategoryColor(event.target.value)} />
-          <select value={newCategoryIcon} onChange={(event) => setNewCategoryIcon(event.target.value)}>
-            {categoryIconOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+          <IconPicker value={newCategoryIcon} onChange={setNewCategoryIcon} />
           <button type="submit">添加</button>
         </form>
         <div className="category-editor-list">
-          {categories.map((category) => (
-            <div className="category-editor-row" key={`${category.type}-${category.name}`}>
-              <div className="category-preview" style={{ "--swatch": category.color } as React.CSSProperties}>
-                <CategoryIcon icon={category.icon} />
+          {categories.map((category) => {
+            const usageCount = transactions.filter((item) => item.category === category.name && item.type === category.type).length;
+            return (
+              <div className="category-editor-row" key={`${category.type}-${category.name}`}>
+                <div className="category-preview" style={{ "--swatch": category.color } as React.CSSProperties}>
+                  <CategoryIcon icon={category.icon} />
+                </div>
+                <div>
+                  <strong>{category.name}</strong>
+                  <span>
+                    {typeLabel[category.type]} · {usageCount} 笔
+                  </span>
+                </div>
+                <input
+                  aria-label={`${category.name}颜色`}
+                  type="color"
+                  value={category.color}
+                  onChange={(event) => category.id && db.categories.update(category.id, { color: event.target.value })}
+                />
+                <button
+                  type="button"
+                  className="category-delete"
+                  onClick={() => category.id && db.categories.delete(category.id)}
+                >
+                  删除
+                </button>
+                <IconPicker
+                  value={category.icon || "wallet"}
+                  onChange={(icon) => category.id && db.categories.update(category.id, { icon })}
+                />
               </div>
-              <div>
-                <strong>{category.name}</strong>
-                <span>{typeLabel[category.type]}</span>
-              </div>
-              <input
-                aria-label={`${category.name}颜色`}
-                type="color"
-                value={category.color}
-                onChange={(event) => category.id && db.categories.update(category.id, { color: event.target.value })}
-              />
-              <select
-                aria-label={`${category.name}图标`}
-                value={category.icon || "wallet"}
-                onChange={(event) => category.id && db.categories.update(category.id, { icon: event.target.value })}
-              >
-                {categoryIconOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </section>
+  );
+}
+
+function IconPicker({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  return (
+    <div className="icon-picker">
+      {categoryIconOptions.map((option) => (
+        <button
+          type="button"
+          key={option.value}
+          className={value === option.value ? "selected" : ""}
+          title={option.label}
+          aria-label={option.label}
+          onClick={() => onChange(option.value)}
+        >
+          <CategoryIcon icon={option.value} />
+        </button>
+      ))}
+    </div>
   );
 }
 
