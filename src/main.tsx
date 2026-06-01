@@ -30,6 +30,7 @@ function App() {
   const [view, setView] = useState<View>("home");
   const [isEntryOpen, setIsEntryOpen] = useState(false);
   const [isEntryClosing, setIsEntryClosing] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const isEntryOpenRef = useRef(false);
   const entryHistoryPushedRef = useRef(false);
   const [month, setMonth] = useState(monthKey());
@@ -87,7 +88,8 @@ function App() {
             accounts={accounts}
             accountFilter={homeAccountFilter}
             setAccountFilter={setHomeAccountFilter}
-            goAdd={openEntryPage}
+            goAdd={() => openEntryPage()}
+            goEdit={openEntryPage}
           />
         )}
         {view === "assets" && <AssetsView items={transactions} accounts={accounts} />}
@@ -99,10 +101,10 @@ function App() {
         <section className={`entry-page ${isEntryClosing ? "leaving" : ""}`} aria-labelledby="entry-title">
           <div className="entry-page-inner">
             <div className="sheet-title">
-              <h2 id="entry-title">记一笔</h2>
+              <h2 id="entry-title">{editingTransaction ? "修改一笔" : "记一笔"}</h2>
               <button onClick={closeEntryPage}>关闭</button>
             </div>
-            <EntryForm categories={categories} accounts={accounts} onDone={closeEntryPage} />
+            <EntryForm categories={categories} accounts={accounts} transaction={editingTransaction} onDone={closeEntryPage} />
           </div>
         </section>
       )}
@@ -114,15 +116,16 @@ function App() {
           <TabBar.Item key="stats" icon={<BarChart3 size={20} />} title="统计" />
           <TabBar.Item key="settings" icon={<Settings size={20} />} title="设置" />
         </TabBar>
-        <button className="add-fab" aria-label="记一笔" onClick={openEntryPage}>
+        <button className="add-fab" aria-label="记一笔" onClick={() => openEntryPage()}>
           <Plus size={26} />
         </button>
       </nav>
     </main>
   );
 
-  function openEntryPage() {
+  function openEntryPage(transaction?: Transaction) {
     if (isEntryOpenRef.current) return;
+    setEditingTransaction(transaction ?? null);
     window.history.pushState({ localMoneyEntry: true }, "", window.location.href);
     entryHistoryPushedRef.current = true;
     setIsEntryClosing(false);
@@ -143,6 +146,7 @@ function App() {
     window.setTimeout(() => {
       setIsEntryOpen(false);
       setIsEntryClosing(false);
+      setEditingTransaction(null);
       isEntryOpenRef.current = false;
       entryHistoryPushedRef.current = false;
     }, 220);
@@ -165,6 +169,7 @@ function HomeView({
   accountFilter,
   setAccountFilter,
   goAdd,
+  goEdit,
 }: {
   items: Transaction[];
   categories: ReturnType<typeof useCategories>;
@@ -172,6 +177,7 @@ function HomeView({
   accountFilter: string;
   setAccountFilter: (value: string) => void;
   goAdd: () => void;
+  goEdit: (transaction: Transaction) => void;
 }) {
   const expense = sumByType(items, "expense");
   const income = sumByType(items, "income");
@@ -203,7 +209,7 @@ function HomeView({
         <div className="section-title">
           <h2>本月明细</h2>
         </div>
-        {items.length === 0 ? <EmptyState /> : <TransactionList items={items} categories={categories} accounts={accounts} />}
+        {items.length === 0 ? <EmptyState /> : <TransactionList items={items} goEdit={goEdit} />}
       </section>
     </>
   );
@@ -219,19 +225,31 @@ function Metric({ icon, label, value, tone }: { icon: React.ReactNode; label: st
   );
 }
 
-function EntryForm({ categories, accounts, onDone }: { categories: ReturnType<typeof useCategories>; accounts: Account[]; onDone: () => void }) {
-  const [type, setType] = useState<TransactionType>("expense");
+function EntryForm({
+  categories,
+  accounts,
+  transaction,
+  onDone,
+}: {
+  categories: ReturnType<typeof useCategories>;
+  accounts: Account[];
+  transaction: Transaction | null;
+  onDone: () => void;
+}) {
+  const [type, setType] = useState<TransactionType>(transaction?.type ?? "expense");
   const typeCategories = categories.filter((category) => category.type === type);
   const accountNames = accounts.length ? accounts.map((item) => item.name) : defaultAccounts;
-  const [amount, setAmount] = useState("");
-  const [category, setCategory] = useState(typeCategories[0]?.name ?? "");
-  const [account, setAccount] = useState(accountNames[0]);
-  const [date, setDate] = useState(todayInputValue());
-  const [note, setNote] = useState("");
+  const [amount, setAmount] = useState(transaction ? String(transaction.amount) : "");
+  const [category, setCategory] = useState(transaction?.category ?? typeCategories[0]?.name ?? "");
+  const [account, setAccount] = useState(transaction?.account ?? accountNames[0]);
+  const [date, setDate] = useState(transaction?.date ?? todayInputValue());
+  const [note, setNote] = useState(transaction?.note ?? "");
 
   useEffect(() => {
-    setCategory(typeCategories[0]?.name ?? "");
-  }, [type, categories.length]);
+    if (!typeCategories.some((item) => item.name === category)) {
+      setCategory(typeCategories[0]?.name ?? "");
+    }
+  }, [type, categories.length, category]);
 
   useEffect(() => {
     if (!accountNames.includes(account)) {
@@ -248,16 +266,23 @@ function EntryForm({ categories, accounts, onDone }: { categories: ReturnType<ty
     const value = evaluateAmountExpression(amount);
     if (!value || value <= 0 || !category) return;
     const now = new Date().toISOString();
-    await db.transactions.add({
+    const payload = {
       type,
       amount: Math.round(value * 100) / 100,
       category,
       account,
       note: note.trim(),
       date,
-      createdAt: now,
       updatedAt: now,
-    });
+    };
+    if (transaction?.id) {
+      await db.transactions.update(transaction.id, payload);
+    } else {
+      await db.transactions.add({
+        ...payload,
+        createdAt: now,
+      });
+    }
     setAmount("");
     setNote("");
     onDone();
@@ -458,84 +483,36 @@ function useCategories() {
   return useLiveQuery(() => db.categories.toArray(), [], []) ?? [];
 }
 
-type EditDraft = {
-  type: TransactionType;
-  amount: string;
-  category: string;
-  account: string;
-  date: string;
-  note: string;
-};
-
 function TransactionList({
   items,
-  categories,
-  accounts,
+  goEdit,
   compact = false,
 }: {
   items: Transaction[];
-  categories: ReturnType<typeof useCategories>;
-  accounts: Account[];
+  goEdit: (transaction: Transaction) => void;
   compact?: boolean;
 }) {
-  const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [draft, setDraft] = useState<EditDraft | null>(null);
+  const [selectedItem, setSelectedItem] = useState<Transaction | null>(null);
   const groups = groupByDate(items);
-  const accountNames = accounts.length ? accounts.map((item) => item.name) : defaultAccounts;
 
   function selectItem(item: Transaction) {
     if (!item.id) return;
-    setSelectedId((current) => (current === item.id ? null : item.id ?? null));
-    setEditingId(null);
-    setDraft(null);
-  }
-
-  function startEdit(item: Transaction) {
-    if (!item.id) return;
-    setEditingId(item.id);
-    setDraft({
-      type: item.type,
-      amount: String(item.amount),
-      category: item.category,
-      account: item.account || defaultAccounts[0],
-      date: item.date,
-      note: item.note,
-    });
-  }
-
-  async function saveEdit(id: number) {
-    if (!draft) return;
-    const amount = Number(draft.amount);
-    if (!amount || amount <= 0 || !draft.category) return;
-    await db.transactions.update(id, {
-      type: draft.type,
-      amount: Math.round(amount * 100) / 100,
-      category: draft.category,
-      account: draft.account,
-      date: draft.date,
-      note: draft.note.trim(),
-      updatedAt: new Date().toISOString(),
-    });
-    setEditingId(null);
-    setDraft(null);
+    setSelectedItem(item);
   }
 
   async function deleteItem(id: number) {
     await db.transactions.delete(id);
-    setSelectedId(null);
-    setEditingId(null);
-    setDraft(null);
+    setSelectedItem(null);
   }
 
   return (
-    <div className="transaction-list">
-      {Object.entries(groups).map(([date, records]) => (
-        <div className="day-group" key={date}>
-          {!compact && <h3>{shortDate.format(new Date(date))}</h3>}
-          {records.map((item) => (
-            <React.Fragment key={item.id}>
-              <article className="transaction-row clickable" onClick={() => selectItem(item)}>
+    <>
+      <div className="transaction-list">
+        {Object.entries(groups).map(([date, records]) => (
+          <div className="day-group" key={date}>
+            {!compact && <h3>{shortDate.format(new Date(date))}</h3>}
+            {records.map((item) => (
+              <article key={item.id} className="transaction-row clickable" onClick={() => selectItem(item)}>
                 <div className={`type-dot ${item.type}`} />
                 <div className="row-main">
                   <strong>{item.category}</strong>
@@ -546,137 +523,48 @@ function TransactionList({
                   {currency.format(item.amount)}
                 </div>
               </article>
-              {selectedId === item.id && item.id && (
-                <div className="detail-card">
-                  {editingId === item.id && draft ? (
-                    <div className="detail-edit">
-                      <div className="segmented compact-segmented">
-                        <button
-                          type="button"
-                          className={draft.type === "expense" ? "selected" : ""}
-                          onClick={() =>
-                            setDraft((current) =>
-                              current
-                                ? {
-                                    ...current,
-                                    type: "expense",
-                                    category:
-                                      categories.find((category) => category.type === "expense")?.name || current.category,
-                                  }
-                                : current
-                            )
-                          }
-                        >
-                          支出
-                        </button>
-                        <button
-                          type="button"
-                          className={draft.type === "income" ? "selected" : ""}
-                          onClick={() =>
-                            setDraft((current) =>
-                              current
-                                ? {
-                                    ...current,
-                                    type: "income",
-                                    category:
-                                      categories.find((category) => category.type === "income")?.name || current.category,
-                                  }
-                                : current
-                            )
-                          }
-                        >
-                          收入
-                        </button>
-                      </div>
-                      <div className="detail-form-grid">
-                        <label className="field">
-                          <span>金额</span>
-                          <input
-                            inputMode="decimal"
-                            value={draft.amount}
-                            onChange={(event) => setDraft((current) => (current ? { ...current, amount: event.target.value } : current))}
-                          />
-                        </label>
-                        <label className="field">
-                          <span>日期</span>
-                          <input
-                            type="date"
-                            value={draft.date}
-                            onChange={(event) => setDraft((current) => (current ? { ...current, date: event.target.value } : current))}
-                          />
-                        </label>
-                        <label className="field">
-                          <span>分类</span>
-                          <select
-                            value={draft.category}
-                            onChange={(event) => setDraft((current) => (current ? { ...current, category: event.target.value } : current))}
-                          >
-                            {categories
-                              .filter((category) => category.type === draft.type)
-                              .map((category) => (
-                                <option key={`${category.type}-${category.name}`}>{category.name}</option>
-                              ))}
-                          </select>
-                        </label>
-                        <label className="field">
-                          <span>账户</span>
-                          <select
-                            value={draft.account}
-                            onChange={(event) => setDraft((current) => (current ? { ...current, account: event.target.value } : current))}
-                          >
-                            {accountNames.map((account) => (
-                              <option key={account}>{account}</option>
-                            ))}
-                          </select>
-                        </label>
-                      </div>
-                      <label className="field">
-                        <span>备注</span>
-                        <input
-                          value={draft.note}
-                          onChange={(event) => setDraft((current) => (current ? { ...current, note: event.target.value } : current))}
-                        />
-                      </label>
-                      <div className="detail-actions">
-                        <button type="button" className="secondary-button" onClick={() => setEditingId(null)}>
-                          取消
-                        </button>
-                        <button type="button" className="primary-button" onClick={() => saveEdit(item.id!)}>
-                          保存
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="detail-grid">
-                        <span>类型</span>
-                        <strong>{typeLabel[item.type]}</strong>
-                        <span>分类</span>
-                        <strong>{item.category}</strong>
-                        <span>账户</span>
-                        <strong>{item.account || defaultAccounts[0]}</strong>
-                        <span>日期</span>
-                        <strong>{item.date}</strong>
-                        <span>备注</span>
-                        <strong>{item.note || "无"}</strong>
-                      </div>
-                      <div className="detail-actions">
-                        <button type="button" className="secondary-button danger-button" onClick={() => deleteItem(item.id!)}>
-                          删除
-                        </button>
-                        <button type="button" className="primary-button" onClick={() => startEdit(item)}>
-                          修改
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-            </React.Fragment>
-          ))}
+            ))}
+          </div>
+        ))}
+      </div>
+      {selectedItem?.id && (
+        <div className="detail-overlay" role="presentation">
+          <button className="detail-backdrop" aria-label="关闭详情" onClick={() => setSelectedItem(null)} />
+          <section className="detail-card floating" role="dialog" aria-modal="true" aria-label="账单详情">
+            <div className="detail-grid">
+              <span>类型</span>
+              <strong>{typeLabel[selectedItem.type]}</strong>
+              <span>金额</span>
+              <strong>{currency.format(selectedItem.amount)}</strong>
+              <span>分类</span>
+              <strong>{selectedItem.category}</strong>
+              <span>账户</span>
+              <strong>{selectedItem.account || defaultAccounts[0]}</strong>
+              <span>日期</span>
+              <strong>{selectedItem.date}</strong>
+              <span>备注</span>
+              <strong>{selectedItem.note || "无"}</strong>
+            </div>
+            <div className="detail-actions">
+              <button type="button" className="secondary-button danger-button" onClick={() => deleteItem(selectedItem.id!)}>
+                删除
+              </button>
+              <button
+                type="button"
+                className="primary-button"
+                onClick={() => {
+                  const item = selectedItem;
+                  setSelectedItem(null);
+                  goEdit(item);
+                }}
+              >
+                修改
+              </button>
+            </div>
+          </section>
         </div>
-      ))}
-    </div>
+      )}
+    </>
   );
 }
 

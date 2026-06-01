@@ -535,6 +535,43 @@ h1 {
   box-shadow: 0 8px 20px rgba(64, 51, 37, 0.08);
 }
 
+.detail-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.detail-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(31, 38, 36, 0.36);
+}
+
+.detail-card.floating {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 420px);
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  border-radius: 12px;
+  animation: detail-pop 160ms ease-out;
+}
+
+@keyframes detail-pop {
+  from {
+    transform: translateY(10px);
+    opacity: 0.72;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
 .detail-grid {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
