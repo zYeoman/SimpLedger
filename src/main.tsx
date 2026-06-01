@@ -7,8 +7,6 @@ import {
   ArrowDownCircle,
   ArrowUpCircle,
   BarChart3,
-  CalendarDays,
-  ChevronDown,
   Download,
   Home,
   Plus,
@@ -286,7 +284,7 @@ function EntryForm({ categories, accounts, onDone }: { categories: ReturnType<ty
     }
   }
 
-  const dateLabel = date === todayInputValue() ? "今天" : date;
+  const dateLabel = formatEntryDateLabel(date);
   const dateValue = new Date(`${date}T00:00:00`);
   const accountColumns = [accountNames.map((item) => ({ label: item, value: item }))];
 
@@ -322,21 +320,18 @@ function EntryForm({ categories, accounts, onDone }: { categories: ReturnType<ty
             <div className="choice-wrap">
               <DatePicker title="选择日期" value={dateValue} onConfirm={(value) => setDate(toDateInputValue(value))}>
                 {(_, actions) => (
-                  <button type="button" className="choice-button" onClick={actions.open}>
-                    <CalendarDays size={18} />
+                  <Button className="choice-button" fill="outline" shape="rectangular" onClick={actions.open}>
                     {dateLabel}
-                  </button>
+                  </Button>
                 )}
               </DatePicker>
             </div>
             <div className="choice-wrap">
               <Picker columns={accountColumns} value={[account]} onConfirm={(value) => setAccount(String(value[0]))}>
                 {(_, actions) => (
-                  <button type="button" className="choice-button" onClick={actions.open}>
-                    <Wallet size={18} />
+                  <Button className="choice-button" fill="outline" shape="rectangular" onClick={actions.open}>
                     {account}
-                    <ChevronDown size={16} />
-                  </button>
+                  </Button>
                 )}
               </Picker>
             </div>
@@ -375,6 +370,16 @@ function toDateInputValue(value: Date) {
   const month = String(value.getMonth() + 1).padStart(2, "0");
   const day = String(value.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function formatEntryDateLabel(value: string) {
+  if (value === todayInputValue()) return "今天";
+  const date = new Date(`${value}T00:00:00`);
+  const currentYear = new Date().getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  if (date.getFullYear() === currentYear) return `${month}/${day}`;
+  return `${date.getFullYear()}/${month}/${day}`;
 }
 
 function useCategories() {
