@@ -515,6 +515,50 @@ h1 {
   font-weight: 700;
 }
 
+.asset-summary {
+  background: #334a62;
+}
+
+.asset-list {
+  display: grid;
+  gap: 12px;
+}
+
+.asset-row {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: 12px;
+  align-items: center;
+  border: 1px solid #e6ded1;
+  border-radius: 8px;
+  background: #fff;
+  padding: 14px;
+}
+
+.asset-row strong,
+.asset-row span {
+  display: block;
+}
+
+.asset-row strong {
+  color: #27322f;
+  font-size: 18px;
+}
+
+.asset-row span {
+  margin-top: 4px;
+  color: #77807b;
+  font-size: 12px;
+}
+
+.asset-row > div:last-child {
+  text-align: right;
+}
+
+.asset-row .negative {
+  color: #c94f3f;
+}
+
 .empty-state {
   display: grid;
   place-items: center;

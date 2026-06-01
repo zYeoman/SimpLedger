@@ -7,18 +7,18 @@ import {
   BarChart3,
   Download,
   Home,
-  List,
   Plus,
   Settings,
   Trash2,
   Upload,
+  Wallet,
 } from "lucide-react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { db, exportBackup, importBackup, seedCategories, type BackupPayload, type Transaction, type TransactionType } from "./db";
 import { currency, fileSafeStamp, getMonthRange, groupByDate, monthKey, shortDate, sumByType, todayInputValue } from "./utils";
 import "./styles.css";
 
-type View = "home" | "list" | "stats" | "settings";
+type View = "home" | "assets" | "stats" | "settings";
 
 const typeLabel: Record<TransactionType, string> = {
   expense: "支出",
@@ -76,7 +76,7 @@ function App() {
 
       <section className="content">
         {view === "home" && <HomeView items={monthItems} goAdd={openEntryPage} />}
-        {view === "list" && <ListView items={monthItems} />}
+        {view === "assets" && <AssetsView items={transactions} />}
         {view === "stats" && <StatsView items={monthItems} categories={categories} month={month} />}
         {view === "settings" && <SettingsView categories={categories} />}
       </section>
@@ -95,7 +95,7 @@ function App() {
 
       <nav className="bottom-nav">
         <NavButton active={view === "home"} icon={<Home size={20} />} label="首页" onClick={() => setView("home")} />
-        <NavButton active={view === "list"} icon={<List size={20} />} label="明细" onClick={() => setView("list")} />
+        <NavButton active={view === "assets"} icon={<Wallet size={20} />} label="资产" onClick={() => setView("assets")} />
         <button className="add-fab" aria-label="记一笔" onClick={openEntryPage}>
           <Plus size={26} />
         </button>
@@ -136,7 +136,7 @@ function App() {
 function titleForView(view: View) {
   return {
     home: "月度概览",
-    list: "账单明细",
+    assets: "资产统计",
     stats: "分类统计",
     settings: "数据设置",
   }[view];
@@ -154,7 +154,6 @@ function NavButton(props: { active: boolean; icon: React.ReactNode; label: strin
 function HomeView({ items, goAdd }: { items: Transaction[]; goAdd: () => void }) {
   const expense = sumByType(items, "expense");
   const income = sumByType(items, "income");
-  const recent = items.slice(0, 6);
 
   return (
     <>
@@ -174,9 +173,9 @@ function HomeView({ items, goAdd }: { items: Transaction[]; goAdd: () => void })
       </section>
       <section className="panel">
         <div className="section-title">
-          <h2>最近记录</h2>
+          <h2>本月明细</h2>
         </div>
-        {recent.length === 0 ? <EmptyState /> : <TransactionList items={recent} compact />}
+        {items.length === 0 ? <EmptyState /> : <TransactionList items={items} />}
       </section>
     </>
   );
@@ -328,10 +327,6 @@ function useCategories() {
   return useLiveQuery(() => db.categories.toArray(), [], []) ?? [];
 }
 
-function ListView({ items }: { items: Transaction[] }) {
-  return <section className="panel">{items.length === 0 ? <EmptyState /> : <TransactionList items={items} />}</section>;
-}
-
 function TransactionList({ items, compact = false }: { items: Transaction[]; compact?: boolean }) {
   const groups = groupByDate(items);
   return (
@@ -360,6 +355,55 @@ function TransactionList({ items, compact = false }: { items: Transaction[]; com
         </div>
       ))}
     </div>
+  );
+}
+
+function AssetsView({ items }: { items: Transaction[] }) {
+  const rows = accountOptions.map((account) => {
+    const accountItems = items.filter((item) => (item.account || accountOptions[0]) === account);
+    const income = sumByType(accountItems, "income");
+    const expense = sumByType(accountItems, "expense");
+    return {
+      account,
+      income,
+      expense,
+      balance: income - expense,
+      count: accountItems.length,
+    };
+  });
+  const total = rows.reduce((sum, item) => sum + item.balance, 0);
+
+  return (
+    <section className="settings-stack">
+      <div className="summary-band asset-summary">
+        <div>
+          <span>总资产</span>
+          <strong>{currency.format(total)}</strong>
+        </div>
+      </div>
+      <div className="panel">
+        <div className="section-title">
+          <h2>账户汇总</h2>
+          <span>按已记录收支计算</span>
+        </div>
+        <div className="asset-list">
+          {rows.map((row) => (
+            <article className="asset-row" key={row.account}>
+              <div>
+                <strong>{row.account}</strong>
+                <span>{row.count} 笔记录</span>
+              </div>
+              <div>
+                <strong className={row.balance < 0 ? "negative" : ""}>{currency.format(row.balance)}</strong>
+                <span>
+                  收入 {currency.format(row.income)} · 支出 {currency.format(row.expense)}
+                </span>
+              </div>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }
 
