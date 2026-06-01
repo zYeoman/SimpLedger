@@ -524,9 +524,35 @@ h1 {
   gap: 12px;
 }
 
+.asset-add-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.asset-add-form input {
+  min-width: 0;
+  border: 1px solid #e6ded1;
+  border-radius: 8px;
+  background: #fff;
+  padding: 0 12px;
+  color: #27322f;
+}
+
+.asset-add-form button,
+.asset-delete {
+  min-height: 42px;
+  border-radius: 8px;
+  background: #2f6f5e;
+  color: #fff;
+  padding: 0 12px;
+  font-weight: 800;
+}
+
 .asset-row {
   display: grid;
-  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  grid-template-columns: minmax(0, 0.75fr) minmax(0, 1.25fr) auto;
   gap: 12px;
   align-items: center;
   border: 1px solid #e6ded1;
@@ -551,12 +577,23 @@ h1 {
   font-size: 12px;
 }
 
-.asset-row > div:last-child {
+.asset-row > div:nth-child(2) {
   text-align: right;
 }
 
 .asset-row .negative {
   color: #c94f3f;
+}
+
+.asset-delete {
+  min-height: 36px;
+  background: #eef0e7;
+  color: #4d5753;
+}
+
+.asset-delete:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .empty-state {

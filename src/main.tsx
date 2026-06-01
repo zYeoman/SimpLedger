@@ -14,7 +14,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
-import { db, exportBackup, importBackup, seedCategories, type BackupPayload, type Transaction, type TransactionType } from "./db";
+import { db, defaultAccounts, exportBackup, importBackup, seedCategories, type Account, type BackupPayload, type Transaction, type TransactionType } from "./db";
 import { currency, fileSafeStamp, getMonthRange, groupByDate, monthKey, shortDate, sumByType, todayInputValue } from "./utils";
 import "./styles.css";
 
@@ -25,8 +25,6 @@ const typeLabel: Record<TransactionType, string> = {
   income: "收入",
 };
 
-const accountOptions = ["现金", "微信", "支付宝", "银行卡"];
-
 function App() {
   const [view, setView] = useState<View>("home");
   const [isEntryOpen, setIsEntryOpen] = useState(false);
@@ -35,6 +33,7 @@ function App() {
   const entryHistoryPushedRef = useRef(false);
   const [month, setMonth] = useState(monthKey());
   const categories = useLiveQuery(() => db.categories.orderBy("type").toArray(), [], []);
+  const accounts = useLiveQuery(() => db.accounts.orderBy("createdAt").toArray(), [], []);
   const transactions = useLiveQuery(() => db.transactions.orderBy("date").reverse().toArray(), [], []);
 
   useEffect(() => {
@@ -76,7 +75,7 @@ function App() {
 
       <section className="content">
         {view === "home" && <HomeView items={monthItems} goAdd={openEntryPage} />}
-        {view === "assets" && <AssetsView items={transactions} />}
+        {view === "assets" && <AssetsView items={transactions} accounts={accounts} />}
         {view === "stats" && <StatsView items={monthItems} categories={categories} month={month} />}
         {view === "settings" && <SettingsView categories={categories} />}
       </section>
@@ -88,7 +87,7 @@ function App() {
               <h2 id="entry-title">记一笔</h2>
               <button onClick={closeEntryPage}>关闭</button>
             </div>
-            <EntryForm categories={categories} onDone={closeEntryPage} />
+            <EntryForm categories={categories} accounts={accounts} onDone={closeEntryPage} />
           </div>
         </section>
       )}
@@ -191,18 +190,25 @@ function Metric({ icon, label, value, tone }: { icon: React.ReactNode; label: st
   );
 }
 
-function EntryForm({ categories, onDone }: { categories: ReturnType<typeof useCategories>; onDone: () => void }) {
+function EntryForm({ categories, accounts, onDone }: { categories: ReturnType<typeof useCategories>; accounts: Account[]; onDone: () => void }) {
   const [type, setType] = useState<TransactionType>("expense");
   const typeCategories = categories.filter((category) => category.type === type);
+  const accountNames = accounts.length ? accounts.map((item) => item.name) : defaultAccounts;
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState(typeCategories[0]?.name ?? "");
-  const [account, setAccount] = useState(accountOptions[0]);
+  const [account, setAccount] = useState(accountNames[0]);
   const [date, setDate] = useState(todayInputValue());
   const [note, setNote] = useState("");
 
   useEffect(() => {
     setCategory(typeCategories[0]?.name ?? "");
   }, [type, categories.length]);
+
+  useEffect(() => {
+    if (!accountNames.includes(account)) {
+      setAccount(accountNames[0]);
+    }
+  }, [accountNames.join("|")]);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -287,7 +293,7 @@ function EntryForm({ categories, onDone }: { categories: ReturnType<typeof useCa
             <label className="field compact-field">
               <span>账户</span>
               <select value={account} onChange={(event) => setAccount(event.target.value)}>
-                {accountOptions.map((item) => (
+                {accountNames.map((item) => (
                   <option key={item}>{item}</option>
                 ))}
               </select>
@@ -358,9 +364,11 @@ function TransactionList({ items, compact = false }: { items: Transaction[]; com
   );
 }
 
-function AssetsView({ items }: { items: Transaction[] }) {
-  const rows = accountOptions.map((account) => {
-    const accountItems = items.filter((item) => (item.account || accountOptions[0]) === account);
+function AssetsView({ items, accounts }: { items: Transaction[]; accounts: Account[] }) {
+  const [newAccount, setNewAccount] = useState("");
+  const accountNames = accounts.length ? accounts.map((item) => item.name) : defaultAccounts;
+  const rows = accountNames.map((account) => {
+    const accountItems = items.filter((item) => (item.account || defaultAccounts[0]) === account);
     const income = sumByType(accountItems, "income");
     const expense = sumByType(accountItems, "expense");
     return {
@@ -369,9 +377,23 @@ function AssetsView({ items }: { items: Transaction[] }) {
       expense,
       balance: income - expense,
       count: accountItems.length,
+      id: accounts.find((item) => item.name === account)?.id,
     };
   });
   const total = rows.reduce((sum, item) => sum + item.balance, 0);
+
+  async function addAccount(event: React.FormEvent) {
+    event.preventDefault();
+    const name = newAccount.trim();
+    if (!name || accountNames.includes(name)) return;
+    await db.accounts.add({ name, createdAt: new Date().toISOString() });
+    setNewAccount("");
+  }
+
+  async function deleteAccount(id: number | undefined, count: number) {
+    if (!id || count > 0) return;
+    await db.accounts.delete(id);
+  }
 
   return (
     <section className="settings-stack">
@@ -386,6 +408,10 @@ function AssetsView({ items }: { items: Transaction[] }) {
           <h2>账户汇总</h2>
           <span>按已记录收支计算</span>
         </div>
+        <form className="asset-add-form" onSubmit={addAccount}>
+          <input placeholder="新增资产账户" value={newAccount} onChange={(event) => setNewAccount(event.target.value)} />
+          <button type="submit">添加</button>
+        </form>
         <div className="asset-list">
           {rows.map((row) => (
             <article className="asset-row" key={row.account}>
@@ -399,6 +425,9 @@ function AssetsView({ items }: { items: Transaction[] }) {
                   收入 {currency.format(row.income)} · 支出 {currency.format(row.expense)}
                 </span>
               </div>
+              <button className="asset-delete" disabled={row.count > 0} onClick={() => deleteAccount(row.id, row.count)}>
+                删除
+              </button>
             </article>
           ))}
         </div>
