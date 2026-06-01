@@ -32,6 +32,7 @@ function App() {
   const isEntryOpenRef = useRef(false);
   const entryHistoryPushedRef = useRef(false);
   const [month, setMonth] = useState(monthKey());
+  const [homeAccountFilter, setHomeAccountFilter] = useState("all");
   const categories = useLiveQuery(() => db.categories.orderBy("type").toArray(), [], []);
   const accounts = useLiveQuery(() => db.accounts.orderBy("createdAt").toArray(), [], []);
   const transactions = useLiveQuery(() => db.transactions.orderBy("date").reverse().toArray(), [], []);
@@ -62,6 +63,10 @@ function App() {
     const range = getMonthRange(month);
     return transactions.filter((item) => item.date >= range.start && item.date <= range.end);
   }, [month, transactions]);
+  const homeItems = useMemo(() => {
+    if (homeAccountFilter === "all") return monthItems;
+    return monthItems.filter((item) => (item.account || defaultAccounts[0]) === homeAccountFilter);
+  }, [homeAccountFilter, monthItems]);
 
   return (
     <main className="app-shell">
@@ -74,7 +79,15 @@ function App() {
       </header>
 
       <section className="content">
-        {view === "home" && <HomeView items={monthItems} goAdd={openEntryPage} />}
+        {view === "home" && (
+          <HomeView
+            items={homeItems}
+            accounts={accounts}
+            accountFilter={homeAccountFilter}
+            setAccountFilter={setHomeAccountFilter}
+            goAdd={openEntryPage}
+          />
+        )}
         {view === "assets" && <AssetsView items={transactions} accounts={accounts} />}
         {view === "stats" && <StatsView items={monthItems} categories={categories} month={month} />}
         {view === "settings" && <SettingsView categories={categories} />}
@@ -150,21 +163,40 @@ function NavButton(props: { active: boolean; icon: React.ReactNode; label: strin
   );
 }
 
-function HomeView({ items, goAdd }: { items: Transaction[]; goAdd: () => void }) {
+function HomeView({
+  items,
+  accounts,
+  accountFilter,
+  setAccountFilter,
+  goAdd,
+}: {
+  items: Transaction[];
+  accounts: Account[];
+  accountFilter: string;
+  setAccountFilter: (value: string) => void;
+  goAdd: () => void;
+}) {
   const expense = sumByType(items, "expense");
   const income = sumByType(items, "income");
+  const accountNames = accounts.length ? accounts.map((item) => item.name) : defaultAccounts;
 
   return (
     <>
+      <div className="account-filter">
+        <button className={accountFilter === "all" ? "selected" : ""} onClick={() => setAccountFilter("all")}>
+          全部
+        </button>
+        {accountNames.map((account) => (
+          <button key={account} className={accountFilter === account ? "selected" : ""} onClick={() => setAccountFilter(account)}>
+            {account}
+          </button>
+        ))}
+      </div>
       <section className="summary-band">
         <div>
           <span>本月结余</span>
           <strong>{currency.format(income - expense)}</strong>
         </div>
-        <button onClick={goAdd}>
-          <Plus size={18} />
-          记账
-        </button>
       </section>
       <section className="metric-grid">
         <Metric icon={<ArrowDownCircle />} label="支出" value={currency.format(expense)} tone="expense" />

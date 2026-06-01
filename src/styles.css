@@ -75,6 +75,36 @@ h1 {
   gap: 14px;
 }
 
+.account-filter {
+  display: flex;
+  gap: 8px;
+  margin: -4px -16px 0;
+  overflow-x: auto;
+  padding: 4px 16px 0;
+  scrollbar-width: none;
+}
+
+.account-filter::-webkit-scrollbar {
+  display: none;
+}
+
+.account-filter button {
+  flex: 0 0 auto;
+  min-height: 38px;
+  border-radius: 999px;
+  background: #fffaf2;
+  color: #4d5753;
+  border: 1px solid #e6ded1;
+  padding: 0 14px;
+  font-weight: 800;
+}
+
+.account-filter .selected {
+  background: #2f6f5e;
+  color: #fff;
+  border-color: #2f6f5e;
+}
+
 .summary-band {
   display: flex;
   align-items: center;
