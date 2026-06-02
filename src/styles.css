@@ -905,6 +905,16 @@ h1 {
   font-weight: 800;
 }
 
+.update-button {
+  width: 100%;
+}
+
+.setting-hint {
+  margin-top: 10px;
+  color: #77807b;
+  font-size: 13px;
+}
+
 .category-list {
   display: flex;
   flex-wrap: wrap;

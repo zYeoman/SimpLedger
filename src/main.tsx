@@ -1023,6 +1023,7 @@ function StatsCategorySection({ title, total, data }: { title: string; total: nu
 
 function SettingsView({ categories, transactions }: { categories: ReturnType<typeof useCategories>; transactions: Transaction[] }) {
   const fileRef = useRef<HTMLInputElement>(null);
+  const [updateStatus, setUpdateStatus] = useState("");
   const [newCategoryName, setNewCategoryName] = useState("");
   const [newCategoryType, setNewCategoryType] = useState<TransactionType>("expense");
   const [newCategoryColor, setNewCategoryColor] = useState("#6f7680");
@@ -1061,8 +1062,39 @@ function SettingsView({ categories, transactions }: { categories: ReturnType<typ
     setNewCategoryName("");
   }
 
+  async function checkForUpdates() {
+    if (!("serviceWorker" in navigator)) {
+      setUpdateStatus("当前浏览器不支持应用更新检查");
+      return;
+    }
+    const registration = await navigator.serviceWorker.getRegistration();
+    if (!registration) {
+      setUpdateStatus("尚未安装离线服务，请刷新后再试");
+      return;
+    }
+    setUpdateStatus("正在检查...");
+    navigator.serviceWorker.addEventListener(
+      "controllerchange",
+      () => {
+        window.location.reload();
+      },
+      { once: true }
+    );
+    await registration.update();
+    setUpdateStatus("已检查；如果有新版本会自动刷新");
+  }
+
   return (
     <section className="settings-stack">
+      <div className="panel">
+        <div className="section-title">
+          <h2>应用</h2>
+        </div>
+        <button className="secondary-button update-button" onClick={checkForUpdates}>
+          检查更新
+        </button>
+        {updateStatus && <p className="setting-hint">{updateStatus}</p>}
+      </div>
       <div className="panel">
         <div className="section-title">
           <h2>备份</h2>
