@@ -107,11 +107,22 @@ function App() {
 
   return (
     <main className="app-shell">
-      <header className="topbar">
+      <header className={`topbar ${view === "stats" ? "stats-topbar" : ""}`}>
         <div>
           <p className="eyebrow">本地账本</p>
           <h1>{titleForView(view)}</h1>
         </div>
+        {view === "stats" && (
+          <StatsPeriodControls
+            mode={statsMode}
+            setMode={setStatsMode}
+            month={statsMonth}
+            setMonth={setStatsMonth}
+            year={statsYear}
+            setYear={setStatsYear}
+            transactions={transactions}
+          />
+        )}
       </header>
 
       <section className="content">
@@ -860,9 +871,6 @@ function StatsView({
   setYear: (year: string) => void;
   transactions: Transaction[];
 }) {
-  const yearOptions = Array.from(
-    new Set([String(new Date().getFullYear()), ...transactions.map((item) => item.date.slice(0, 4))])
-  ).sort((a, b) => Number(b) - Number(a));
   const expenseTotal = sumByType(items, "expense");
   const incomeTotal = sumByType(items, "income");
   const expenseData = buildCategoryStats(items, categories, "expense");
@@ -870,25 +878,6 @@ function StatsView({
 
   return (
     <section className="stats-page">
-      <div className="stats-controls">
-        <div className="segmented compact-segmented">
-          <button type="button" className={mode === "month" ? "selected" : ""} onClick={() => setMode("month")}>
-            按月
-          </button>
-          <button type="button" className={mode === "year" ? "selected" : ""} onClick={() => setMode("year")}>
-            按年
-          </button>
-        </div>
-        {mode === "month" ? (
-          <input className="stats-date-input" type="month" value={month} onChange={(event) => setMonth(event.target.value)} />
-        ) : (
-          <select className="stats-date-input" value={year} onChange={(event) => setYear(event.target.value)}>
-            {yearOptions.map((item) => (
-              <option key={item}>{item}</option>
-            ))}
-          </select>
-        )}
-      </div>
       <div className="stats-summary">
         <div>
           <span>支出</span>
@@ -906,6 +895,50 @@ function StatsView({
       <StatsCategorySection title="支出分类" total={expenseTotal} data={expenseData} />
       <StatsCategorySection title="收入分类" total={incomeTotal} data={incomeData} />
     </section>
+  );
+}
+
+function StatsPeriodControls({
+  mode,
+  setMode,
+  month,
+  setMonth,
+  year,
+  setYear,
+  transactions,
+}: {
+  mode: "month" | "year";
+  setMode: (mode: "month" | "year") => void;
+  month: string;
+  setMonth: (month: string) => void;
+  year: string;
+  setYear: (year: string) => void;
+  transactions: Transaction[];
+}) {
+  const yearOptions = Array.from(
+    new Set([String(new Date().getFullYear()), ...transactions.map((item) => item.date.slice(0, 4))])
+  ).sort((a, b) => Number(b) - Number(a));
+
+  return (
+    <div className="stats-controls">
+      <div className="segmented compact-segmented">
+        <button type="button" className={mode === "month" ? "selected" : ""} onClick={() => setMode("month")}>
+          按月
+        </button>
+        <button type="button" className={mode === "year" ? "selected" : ""} onClick={() => setMode("year")}>
+          按年
+        </button>
+      </div>
+      {mode === "month" ? (
+        <input className="stats-date-input" type="month" value={month} onChange={(event) => setMonth(event.target.value)} />
+      ) : (
+        <select className="stats-date-input" value={year} onChange={(event) => setYear(event.target.value)}>
+          {yearOptions.map((item) => (
+            <option key={item}>{item}</option>
+          ))}
+        </select>
+      )}
+    </div>
   );
 }
 
