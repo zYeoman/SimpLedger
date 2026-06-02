@@ -1,4 +1,4 @@
-const CACHE_NAME = "local-money-v3";
+const CACHE_NAME = "local-money-v4";
 const ASSETS = ["/", "/index.html", "/manifest.webmanifest", "/icon.svg"];
 
 self.addEventListener("install", (event) => {

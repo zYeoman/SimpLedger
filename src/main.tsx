@@ -63,15 +63,26 @@ function App() {
   const [statsMonth, setStatsMonth] = useState(monthKey());
   const [statsYear, setStatsYear] = useState(String(new Date().getFullYear()));
   const [homeAccountFilter, setHomeAccountFilter] = useState("all");
-  const categories = useLiveQuery(() => db.categories.orderBy("type").toArray(), [], []);
-  const accounts = useLiveQuery(() => db.accounts.orderBy("createdAt").toArray(), [], []);
-  const transactions = useLiveQuery(() => db.transactions.orderBy("date").reverse().toArray(), [], []);
+  const [isSeedReady, setIsSeedReady] = useState(false);
+  const categoryRows = useLiveQuery(() => db.categories.orderBy("type").toArray(), []);
+  const accountRows = useLiveQuery(() => db.accounts.orderBy("createdAt").toArray(), []);
+  const transactionRows = useLiveQuery(() => db.transactions.orderBy("date").reverse().toArray(), []);
+  const categories = categoryRows ?? [];
+  const accounts = accountRows ?? [];
+  const transactions = transactionRows ?? [];
+  const isDataReady = isSeedReady && categoryRows !== undefined && accountRows !== undefined && transactionRows !== undefined;
 
   useEffect(() => {
-    seedCategories();
+    let isActive = true;
+    seedCategories().finally(() => {
+      if (isActive) setIsSeedReady(true);
+    });
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/public-sw.js").catch(() => undefined);
     }
+    return () => {
+      isActive = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -124,7 +135,8 @@ function App() {
       </header>
 
       <section className="content">
-        {view === "home" && (
+        {!isDataReady && <LoadingState />}
+        {isDataReady && view === "home" && (
           <HomeView
             items={homeItems}
             categories={categories}
@@ -135,8 +147,8 @@ function App() {
             goEdit={openEntryPage}
           />
         )}
-        {view === "assets" && <AssetsView items={transactions} accounts={accounts} />}
-        {view === "stats" && (
+        {isDataReady && view === "assets" && <AssetsView items={transactions} accounts={accounts} />}
+        {isDataReady && view === "stats" && (
           <StatsView
             items={statsItems}
             categories={categories}
@@ -145,7 +157,7 @@ function App() {
             year={statsYear}
           />
         )}
-        {view === "settings" && <SettingsView categories={categories} transactions={transactions} />}
+        {isDataReady && view === "settings" && <SettingsView categories={categories} transactions={transactions} />}
       </section>
 
       {isEntryOpen && (
@@ -155,7 +167,11 @@ function App() {
               <h2 id="entry-title">{editingTransaction ? "修改一笔" : "记一笔"}</h2>
               <button onClick={closeEntryPage}>关闭</button>
             </div>
-            <EntryForm categories={categories} accounts={accounts} transaction={editingTransaction} onDone={closeEntryPage} />
+            {isDataReady ? (
+              <EntryForm categories={categories} accounts={accounts} transaction={editingTransaction} onDone={closeEntryPage} />
+            ) : (
+              <LoadingState />
+            )}
           </div>
         </section>
       )}
@@ -167,7 +183,7 @@ function App() {
           <TabBar.Item key="stats" icon={<BarChart3 size={20} />} title="统计" />
           <TabBar.Item key="settings" icon={<Settings size={20} />} title="设置" />
         </TabBar>
-        <button className="add-fab" aria-label="记一笔" onClick={() => openEntryPage()}>
+        <button className="add-fab" aria-label="记一笔" disabled={!isDataReady} onClick={() => openEntryPage()}>
           <Plus size={26} />
         </button>
       </nav>
@@ -175,7 +191,7 @@ function App() {
   );
 
   function openEntryPage(transaction?: Transaction) {
-    if (isEntryOpenRef.current) return;
+    if (isEntryOpenRef.current || !isDataReady) return;
     setEditingTransaction(transaction ?? null);
     window.history.pushState({ localMoneyEntry: true }, "", window.location.href);
     entryHistoryPushedRef.current = true;
@@ -1233,6 +1249,10 @@ function ColorPicker({ value, onChange }: { value: string; onChange: (value: str
 
 function EmptyState() {
   return <div className="empty-state">暂无记录</div>;
+}
+
+function LoadingState() {
+  return <div className="empty-state loading-state">正在加载本地数据</div>;
 }
 
 createRoot(document.getElementById("root")!).render(<App />);

@@ -1255,6 +1255,12 @@ h1 {
   color: #7b837f;
 }
 
+.loading-state {
+  border: 1px solid #e6ded1;
+  border-radius: 8px;
+  background: #fffaf2;
+}
+
 .bottom-nav {
   position: fixed;
   right: 0;
@@ -1298,6 +1304,11 @@ h1 {
   background: #2f6f5e;
   color: white;
   box-shadow: 0 10px 20px rgba(47, 111, 94, 0.3);
+}
+
+.add-fab:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 @media (max-width: 380px) {
