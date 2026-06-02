@@ -1072,16 +1072,14 @@ function SettingsView({ categories, transactions }: { categories: ReturnType<typ
       setUpdateStatus("尚未安装离线服务，请刷新后再试");
       return;
     }
-    setUpdateStatus("正在检查...");
-    navigator.serviceWorker.addEventListener(
-      "controllerchange",
-      () => {
-        window.location.reload();
-      },
-      { once: true }
-    );
+    setUpdateStatus("正在更新...");
     await registration.update();
-    setUpdateStatus("已检查；如果有新版本会自动刷新");
+    if ("caches" in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((key) => caches.delete(key)));
+    }
+    setUpdateStatus("即将刷新应用");
+    window.setTimeout(() => window.location.reload(), 300);
   }
 
   return (
