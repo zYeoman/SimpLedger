@@ -1112,6 +1112,9 @@ h1 {
 }
 
 .icon-picker-popup {
+  display: flex;
+  max-height: min(76dvh, 620px);
+  flex-direction: column;
   border-radius: 16px 16px 0 0;
   padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
 }
@@ -1132,6 +1135,16 @@ h1 {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: 8px;
+  min-height: 0;
+  max-height: min(56dvh, 480px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 2px;
+  scrollbar-width: none;
+}
+
+.icon-picker-panel::-webkit-scrollbar {
+  display: none;
 }
 
 .icon-picker-panel button {
@@ -1371,6 +1384,7 @@ h1 {
 
   .icon-picker-panel {
     grid-template-columns: repeat(4, 1fr);
+    max-height: min(52dvh, 420px);
   }
 
   .color-picker-panel {

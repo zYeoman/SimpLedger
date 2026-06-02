@@ -6,14 +6,32 @@ import "antd-mobile/bundle/style.css";
 import {
   ArrowDownCircle,
   ArrowUpCircle,
+  Apple,
+  Baby,
   BarChart3,
+  BadgeCent,
+  BadgeDollarSign,
+  BadgePercent,
+  Banknote,
+  Beer,
+  Bike,
   BookOpen,
   BriefcaseBusiness,
+  Building2,
   Bus,
+  CakeSlice,
+  Candy,
   Car,
+  Cat,
   CircleDollarSign,
+  Clapperboard,
+  Coins,
   Coffee,
+  Cookie,
   CreditCard,
+  CupSoda,
+  Dog,
+  Droplets,
   Dumbbell,
   Download,
   Film,
@@ -21,22 +39,46 @@ import {
   Gift,
   GraduationCap,
   Gamepad2,
+  HandCoins,
   HeartPulse,
   Home,
+  Hospital,
   House,
+  IceCream,
+  KeyRound,
   Landmark,
+  Lightbulb,
+  Milk,
   Music,
+  Package,
   PiggyBank,
+  Pill,
   Plane,
+  Pizza,
   Plus,
   ReceiptText,
+  Sandwich,
   Settings,
+  ShieldPlus,
   ShoppingBag,
+  ShoppingCart,
   Shirt,
+  Ship,
+  ShowerHead,
   Smartphone,
+  Soup,
+  Store,
+  Tags,
+  Ticket,
+  Train,
+  TrendingUp,
+  Truck,
+  Umbrella,
   Upload,
   Utensils,
   Wallet,
+  Wifi,
+  Wine,
   Wrench,
   Zap,
 } from "lucide-react";
@@ -688,32 +730,82 @@ function formatAmountPlain(value: number) {
 }
 
 const categoryIconOptions = [
+  { value: "eat", label: "吃饭" },
+  { value: "hamburger", label: "汉堡" },
   { value: "food", label: "餐饮" },
+  { value: "soup", label: "汤粥" },
+  { value: "pizza", label: "披萨" },
+  { value: "ice", label: "冷饮" },
+  { value: "drink", label: "饮料" },
   { value: "coffee", label: "咖啡" },
+  { value: "beer", label: "酒水" },
+  { value: "milk", label: "奶制品" },
+  { value: "fruit", label: "水果" },
+  { value: "snack", label: "零食" },
+  { value: "cake", label: "甜品" },
+  { value: "traffic", label: "交通" },
   { value: "bus", label: "交通" },
   { value: "car", label: "汽车" },
+  { value: "bike", label: "骑行" },
+  { value: "train", label: "火车" },
+  { value: "fly", label: "飞机" },
   { value: "fuel", label: "加油" },
   { value: "plane", label: "出行" },
+  { value: "taxi", label: "打车" },
+  { value: "ship", label: "船舶" },
+  { value: "shop", label: "商店" },
+  { value: "cart", label: "购物车" },
+  { value: "bag", label: "购物袋" },
   { value: "shopping", label: "购物" },
   { value: "shirt", label: "服饰" },
   { value: "gift", label: "礼物" },
+  { value: "tags", label: "优惠" },
+  { value: "ticket", label: "票券" },
+  { value: "house", label: "房屋" },
   { value: "home", label: "居住" },
+  { value: "life", label: "生活" },
+  { value: "water", label: "水电" },
+  { value: "safe", label: "保险" },
+  { value: "key", label: "钥匙" },
+  { value: "building", label: "楼房" },
   { value: "health", label: "医疗" },
+  { value: "medical", label: "医疗" },
+  { value: "pill", label: "药物" },
+  { value: "hospital", label: "医院" },
   { value: "fitness", label: "健身" },
+  { value: "happy", label: "娱乐" },
   { value: "game", label: "娱乐" },
   { value: "film", label: "电影" },
+  { value: "movie", label: "电影" },
   { value: "music", label: "音乐" },
   { value: "daily", label: "日用" },
+  { value: "light", label: "电费" },
+  { value: "shower", label: "洗护" },
+  { value: "wifi", label: "网络" },
   { value: "phone", label: "数码" },
+  { value: "education", label: "教育" },
   { value: "book", label: "学习" },
+  { value: "baby", label: "育儿" },
+  { value: "pet", label: "宠物" },
   { value: "work", label: "工作" },
   { value: "card", label: "卡片" },
   { value: "bank", label: "银行" },
   { value: "receipt", label: "票据" },
   { value: "repair", label: "维修" },
+  { value: "salary", label: "工资" },
+  { value: "income", label: "收入" },
+  { value: "cash", label: "现金" },
+  { value: "awards", label: "奖金" },
+  { value: "refund", label: "退款" },
+  { value: "dividends", label: "分红" },
+  { value: "manage", label: "理财" },
+  { value: "sale", label: "销售" },
+  { value: "coins", label: "硬币" },
+  { value: "percent", label: "折扣" },
   { value: "money", label: "钱币" },
   { value: "piggy", label: "储蓄" },
   { value: "wallet", label: "钱包" },
+  { value: "package", label: "快递" },
 ];
 
 const categoryColorOptions = [
@@ -735,31 +827,86 @@ const categoryColorOptions = [
 
 function CategoryIcon({ icon }: { icon?: string }) {
   const props = { size: 26, strokeWidth: 2.8 };
+  if (icon === "eat") return <Utensils {...props} />;
+  if (icon === "hamburger") return <Sandwich {...props} />;
   if (icon === "food") return <Utensils {...props} />;
+  if (icon === "soup") return <Soup {...props} />;
+  if (icon === "pizza") return <Pizza {...props} />;
+  if (icon === "ice") return <IceCream {...props} />;
+  if (icon === "drink") return <CupSoda {...props} />;
   if (icon === "coffee") return <Coffee {...props} />;
+  if (icon === "beer") return <Beer {...props} />;
+  if (icon === "milk") return <Milk {...props} />;
+  if (icon === "fruit") return <Apple {...props} />;
+  if (icon === "snack") return <Cookie {...props} />;
+  if (icon === "cake") return <CakeSlice {...props} />;
+  if (icon === "traffic") return <Bus {...props} />;
   if (icon === "bus") return <Bus {...props} />;
   if (icon === "car") return <Car {...props} />;
+  if (icon === "bike") return <Bike {...props} />;
+  if (icon === "train") return <Train {...props} />;
+  if (icon === "fly") return <Plane {...props} />;
   if (icon === "fuel") return <Fuel {...props} />;
   if (icon === "plane") return <Plane {...props} />;
+  if (icon === "taxi") return <Car {...props} />;
+  if (icon === "ship") return <Ship {...props} />;
+  if (icon === "shop") return <Store {...props} />;
+  if (icon === "cart") return <ShoppingCart {...props} />;
+  if (icon === "bag") return <ShoppingBag {...props} />;
   if (icon === "shopping") return <ShoppingBag {...props} />;
   if (icon === "shirt") return <Shirt {...props} />;
   if (icon === "gift") return <Gift {...props} />;
+  if (icon === "tags") return <Tags {...props} />;
+  if (icon === "ticket") return <Ticket {...props} />;
+  if (icon === "house") return <House {...props} />;
   if (icon === "home") return <House {...props} />;
+  if (icon === "life") return <Zap {...props} />;
+  if (icon === "water") return <Droplets {...props} />;
+  if (icon === "safe") return <ShieldPlus {...props} />;
+  if (icon === "key") return <KeyRound {...props} />;
+  if (icon === "building") return <Building2 {...props} />;
   if (icon === "health") return <HeartPulse {...props} />;
+  if (icon === "medical") return <HeartPulse {...props} />;
+  if (icon === "pill") return <Pill {...props} />;
+  if (icon === "hospital") return <Hospital {...props} />;
   if (icon === "fitness") return <Dumbbell {...props} />;
+  if (icon === "happy") return <Gamepad2 {...props} />;
   if (icon === "game") return <Gamepad2 {...props} />;
   if (icon === "film") return <Film {...props} />;
+  if (icon === "movie") return <Clapperboard {...props} />;
   if (icon === "music") return <Music {...props} />;
   if (icon === "daily") return <Zap {...props} />;
+  if (icon === "light") return <Lightbulb {...props} />;
+  if (icon === "shower") return <ShowerHead {...props} />;
+  if (icon === "wifi") return <Wifi {...props} />;
   if (icon === "phone") return <Smartphone {...props} />;
+  if (icon === "education") return <GraduationCap {...props} />;
   if (icon === "book") return <BookOpen {...props} />;
+  if (icon === "baby") return <Baby {...props} />;
+  if (icon === "pet") return <Dog {...props} />;
+  if (icon === "cat") return <Cat {...props} />;
   if (icon === "work") return <BriefcaseBusiness {...props} />;
   if (icon === "card") return <CreditCard {...props} />;
   if (icon === "bank") return <Landmark {...props} />;
   if (icon === "receipt") return <ReceiptText {...props} />;
   if (icon === "repair") return <Wrench {...props} />;
+  if (icon === "salary") return <BadgeDollarSign {...props} />;
+  if (icon === "income") return <HandCoins {...props} />;
+  if (icon === "cash") return <Banknote {...props} />;
+  if (icon === "awards") return <Gift {...props} />;
+  if (icon === "refund") return <ReceiptText {...props} />;
+  if (icon === "dividends") return <PiggyBank {...props} />;
+  if (icon === "manage") return <TrendingUp {...props} />;
+  if (icon === "sale") return <Store {...props} />;
+  if (icon === "coins") return <Coins {...props} />;
+  if (icon === "percent") return <BadgePercent {...props} />;
+  if (icon === "cent") return <BadgeCent {...props} />;
   if (icon === "money") return <CircleDollarSign {...props} />;
   if (icon === "piggy") return <PiggyBank {...props} />;
+  if (icon === "package") return <Package {...props} />;
+  if (icon === "truck") return <Truck {...props} />;
+  if (icon === "umbrella") return <Umbrella {...props} />;
+  if (icon === "wine") return <Wine {...props} />;
   return <Wallet {...props} />;
 }
 
