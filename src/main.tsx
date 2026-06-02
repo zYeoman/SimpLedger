@@ -206,10 +206,10 @@ function App() {
 
 function titleForView(view: View) {
   return {
-    home: "月度概览",
-    assets: "资产统计",
-    stats: "分类统计",
-    settings: "数据设置",
+    home: "记账",
+    assets: "资产",
+    stats: "统计",
+    settings: "设置",
   }[view];
 }
 
