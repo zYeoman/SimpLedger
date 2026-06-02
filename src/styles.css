@@ -450,10 +450,10 @@ h1 {
   min-height: 0;
   overflow: hidden;
   padding: 6px 10px 6px 7px;
-  border: 0;
+  border: 1px solid #eadfce;
   border-radius: 999px;
-  background: #fff;
-  box-shadow: 0 8px 18px rgba(64, 51, 37, 0.06);
+  background: #fffaf2;
+  box-shadow: 0 6px 14px rgba(64, 51, 37, 0.04);
   font-size: 14px;
   line-height: 1;
 }
@@ -464,7 +464,7 @@ h1 {
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  background: #f0f2f5;
+  background: #efe7dc;
   color: #38424c;
 }
 
@@ -485,7 +485,8 @@ h1 {
 }
 
 .category-grid .selected {
-  background: #fff;
+  border-color: #dfd0bc;
+  background: #f8efe3;
   color: #38424c;
 }
 
