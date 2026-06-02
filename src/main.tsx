@@ -84,7 +84,7 @@ import {
 } from "lucide-react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { db, defaultAccounts, exportBackup, importBackup, seedCategories, type Account, type BackupPayload, type Transaction, type TransactionType } from "./db";
-import { currency, fileSafeStamp, getMonthRange, groupByDate, monthKey, sumByType, todayInputValue } from "./utils";
+import { currency, fileSafeStamp, getMonthRange, getMonthWindowRange, groupByDate, monthKey, sumByType, todayInputValue } from "./utils";
 import "./styles.css";
 
 type View = "home" | "assets" | "stats" | "settings";
@@ -105,14 +105,22 @@ function App() {
   const [statsMonth, setStatsMonth] = useState(monthKey());
   const [statsYear, setStatsYear] = useState(String(new Date().getFullYear()));
   const [homeAccountFilter, setHomeAccountFilter] = useState("all");
+  const [homeMonthCount, setHomeMonthCount] = useState(1);
   const [isSeedReady, setIsSeedReady] = useState(false);
   const categoryRows = useLiveQuery(() => db.categories.orderBy("type").toArray(), []);
   const accountRows = useLiveQuery(() => db.accounts.orderBy("createdAt").toArray(), []);
-  const transactionRows = useLiveQuery(() => db.transactions.orderBy("date").reverse().toArray(), []);
+  const transactionRows = useLiveQuery(() => {
+    if (view === "home") {
+      const range = getMonthWindowRange(homeMonthCount);
+      return db.transactions.where("date").between(range.start, range.end, true, true).reverse().toArray();
+    }
+    return db.transactions.orderBy("date").reverse().toArray();
+  }, [view, homeMonthCount]);
   const categories = categoryRows ?? [];
   const accounts = accountRows ?? [];
   const transactions = transactionRows ?? [];
   const isDataReady = isSeedReady && categoryRows !== undefined && accountRows !== undefined && transactionRows !== undefined;
+  const isLoadingHomeMoreRef = useRef(false);
 
   useEffect(() => {
     let isActive = true;
@@ -130,6 +138,25 @@ function App() {
   useEffect(() => {
     isEntryOpenRef.current = isEntryOpen;
   }, [isEntryOpen]);
+
+  useEffect(() => {
+    isLoadingHomeMoreRef.current = false;
+  }, [transactionRows]);
+
+  useEffect(() => {
+    if (view !== "home" || !isDataReady) return;
+    function loadMoreWhenNearBottom() {
+      if (isLoadingHomeMoreRef.current) return;
+      const scrollBottom = window.scrollY + window.innerHeight;
+      const pageBottom = document.documentElement.scrollHeight;
+      if (scrollBottom < pageBottom - 420) return;
+      isLoadingHomeMoreRef.current = true;
+      setHomeMonthCount((count) => count + 1);
+    }
+    window.addEventListener("scroll", loadMoreWhenNearBottom, { passive: true });
+    loadMoreWhenNearBottom();
+    return () => window.removeEventListener("scroll", loadMoreWhenNearBottom);
+  }, [view, isDataReady]);
 
   useEffect(() => {
     function handlePopState() {
@@ -150,6 +177,10 @@ function App() {
     if (homeAccountFilter === "all") return currentMonthItems;
     return currentMonthItems.filter((item) => (item.account || defaultAccounts[0]) === homeAccountFilter);
   }, [homeAccountFilter, currentMonthItems]);
+  const homeDetailItems = useMemo(() => {
+    if (homeAccountFilter === "all") return transactions;
+    return transactions.filter((item) => (item.account || defaultAccounts[0]) === homeAccountFilter);
+  }, [homeAccountFilter, transactions]);
   const statsItems = useMemo(() => {
     if (statsMode === "month") {
       const range = getMonthRange(statsMonth);
@@ -181,6 +212,7 @@ function App() {
         {isDataReady && view === "home" && (
           <HomeView
             items={homeItems}
+            detailItems={homeDetailItems}
             categories={categories}
             accounts={accounts}
             accountFilter={homeAccountFilter}
@@ -273,6 +305,7 @@ function titleForView(view: View) {
 
 function HomeView({
   items,
+  detailItems,
   categories,
   accounts,
   accountFilter,
@@ -281,6 +314,7 @@ function HomeView({
   goEdit,
 }: {
   items: Transaction[];
+  detailItems: Transaction[];
   categories: ReturnType<typeof useCategories>;
   accounts: Account[];
   accountFilter: string;
@@ -310,11 +344,44 @@ function HomeView({
       </section>
       <section className="panel">
         <div className="section-title">
-          <h2>本月明细</h2>
+          <h2>明细</h2>
         </div>
-        {items.length === 0 ? <EmptyState /> : <TransactionList items={items} categories={categories} goEdit={goEdit} />}
+        {detailItems.length === 0 ? <EmptyState /> : <MonthlyTransactionList items={detailItems} categories={categories} goEdit={goEdit} />}
       </section>
     </>
+  );
+}
+
+function MonthlyTransactionList({
+  items,
+  categories,
+  goEdit,
+}: {
+  items: Transaction[];
+  categories: ReturnType<typeof useCategories>;
+  goEdit: (transaction: Transaction) => void;
+}) {
+  const groups = items.reduce<Record<string, Transaction[]>>((result, item) => {
+    const key = item.date.slice(0, 7);
+    result[key] = result[key] ?? [];
+    result[key].push(item);
+    return result;
+  }, {});
+  const months = Object.keys(groups).sort((a, b) => b.localeCompare(a));
+
+  return (
+    <div className="month-detail-stack">
+      {months.map((month) => (
+        <section className="month-detail-card" key={month}>
+          <div className="section-title month-detail-title">
+            <h3>{formatMonthTitle(month)}</h3>
+            <span>{groups[month].length} 笔</span>
+          </div>
+          <TransactionList items={groups[month]} categories={categories} goEdit={goEdit} />
+        </section>
+      ))}
+      <div className="load-more-hint">继续下滑加载更早月份</div>
+    </div>
   );
 }
 
@@ -1085,6 +1152,12 @@ function StatsPeriodControls({
 function formatStatsMonthLabel(value: string) {
   const [year, month] = value.split("-");
   return `${year.slice(-2)}/${month}`;
+}
+
+function formatMonthTitle(value: string) {
+  const [year, month] = value.split("-");
+  if (year === String(new Date().getFullYear())) return `${month}月`;
+  return `${year}年${month}月`;
 }
 
 type CategoryStat = {

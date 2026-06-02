@@ -501,6 +501,42 @@ h1 {
   color: var(--swatch);
 }
 
+.month-detail-stack {
+  display: grid;
+  gap: 14px;
+}
+
+.month-detail-card {
+  border-top: 1px solid #eadfce;
+  padding-top: 12px;
+}
+
+.month-detail-card:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.month-detail-title {
+  margin-bottom: 10px;
+}
+
+.month-detail-title h3 {
+  color: #27322f;
+  font-size: 16px;
+}
+
+.month-detail-title span,
+.load-more-hint {
+  color: #7b837f;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.load-more-hint {
+  padding: 4px 0 0;
+  text-align: center;
+}
+
 .transaction-list {
   display: grid;
   gap: 22px;

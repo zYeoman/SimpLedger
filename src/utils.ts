@@ -11,21 +11,44 @@ export const shortDate = new Intl.DateTimeFormat("zh-CN", {
   day: "2-digit",
 });
 
+function localDatePart(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export function todayInputValue() {
-  return new Date().toISOString().slice(0, 10);
+  return localDatePart(new Date());
 }
 
 export function monthKey(date = new Date()) {
-  return date.toISOString().slice(0, 7);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  return `${year}-${month}`;
 }
 
 export function getMonthRange(key: string) {
   const [year, month] = key.split("-").map(Number);
-  const start = new Date(year, month - 1, 1);
   const end = new Date(year, month, 0);
+  const monthPart = String(month).padStart(2, "0");
   return {
-    start: start.toISOString().slice(0, 10),
-    end: end.toISOString().slice(0, 10),
+    start: `${year}-${monthPart}-01`,
+    end: localDatePart(end),
+  };
+}
+
+export function addMonthsToKey(key: string, offset: number) {
+  const [year, month] = key.split("-").map(Number);
+  return monthKey(new Date(year, month - 1 + offset, 1));
+}
+
+export function getMonthWindowRange(count: number, base = monthKey()) {
+  const safeCount = Math.max(1, count);
+  const startMonth = addMonthsToKey(base, 1 - safeCount);
+  return {
+    start: getMonthRange(startMonth).start,
+    end: getMonthRange(base).end,
   };
 }
 
