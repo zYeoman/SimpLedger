@@ -441,12 +441,18 @@ h1 {
 
 .category-grid button {
   display: grid;
+  grid-template-rows: 28px 16px;
   place-items: center;
   gap: 6px;
+  height: 64px;
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  padding: 7px 4px 6px;
   border: 1px solid #e6ded1;
   background: #fffaf2;
-  font-size: 14px;
+  font-size: 12px;
+  line-height: 1;
 }
 
 .category-grid span {
@@ -462,6 +468,17 @@ h1 {
 .category-grid span svg {
   width: 16px;
   height: 16px;
+}
+
+.category-grid em {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-style: normal;
 }
 
 .transaction-list {

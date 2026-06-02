@@ -420,7 +420,7 @@ function EntryForm({
             <span>
               <CategoryIcon icon={item.icon} />
             </span>
-            {item.name}
+            <em>{item.name}</em>
           </button>
         ))}
       </div>
