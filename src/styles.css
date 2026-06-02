@@ -216,8 +216,9 @@ h1 {
 }
 
 .entry-form {
-  min-height: calc(100dvh - 80px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
-  grid-template-rows: auto auto minmax(0, 1fr);
+  height: calc(100dvh - 80px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
 .entry-page {
@@ -427,8 +428,9 @@ h1 {
 .category-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-content: start;
   gap: 10px;
-  max-height: min(34dvh, 260px);
+  min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
   padding-right: 2px;
@@ -1375,7 +1377,6 @@ h1 {
 
   .category-grid {
     grid-template-columns: repeat(3, 1fr);
-    max-height: min(30dvh, 220px);
   }
 
   .category-add-form {
