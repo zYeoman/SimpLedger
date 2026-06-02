@@ -1432,10 +1432,6 @@ h1 {
     gap: 6px;
   }
 
-  .stats-topbar h1 {
-    font-size: 23px;
-  }
-
   .stats-control-button {
     min-height: 32px;
     padding-inline: 8px;
