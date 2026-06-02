@@ -42,7 +42,7 @@ import {
 } from "lucide-react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { db, defaultAccounts, exportBackup, importBackup, seedCategories, type Account, type BackupPayload, type Transaction, type TransactionType } from "./db";
-import { currency, fileSafeStamp, getMonthRange, groupByDate, monthKey, shortDate, sumByType, todayInputValue } from "./utils";
+import { currency, fileSafeStamp, getMonthRange, groupByDate, monthKey, sumByType, todayInputValue } from "./utils";
 import "./styles.css";
 
 type View = "home" | "assets" | "stats" | "settings";
@@ -59,7 +59,9 @@ function App() {
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const isEntryOpenRef = useRef(false);
   const entryHistoryPushedRef = useRef(false);
-  const [month, setMonth] = useState(monthKey());
+  const [statsMode, setStatsMode] = useState<"month" | "year">("month");
+  const [statsMonth, setStatsMonth] = useState(monthKey());
+  const [statsYear, setStatsYear] = useState(String(new Date().getFullYear()));
   const [homeAccountFilter, setHomeAccountFilter] = useState("all");
   const categories = useLiveQuery(() => db.categories.orderBy("type").toArray(), [], []);
   const accounts = useLiveQuery(() => db.accounts.orderBy("createdAt").toArray(), [], []);
@@ -87,14 +89,21 @@ function App() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
-  const monthItems = useMemo(() => {
-    const range = getMonthRange(month);
+  const currentMonthItems = useMemo(() => {
+    const range = getMonthRange(monthKey());
     return transactions.filter((item) => item.date >= range.start && item.date <= range.end);
-  }, [month, transactions]);
+  }, [transactions]);
   const homeItems = useMemo(() => {
-    if (homeAccountFilter === "all") return monthItems;
-    return monthItems.filter((item) => (item.account || defaultAccounts[0]) === homeAccountFilter);
-  }, [homeAccountFilter, monthItems]);
+    if (homeAccountFilter === "all") return currentMonthItems;
+    return currentMonthItems.filter((item) => (item.account || defaultAccounts[0]) === homeAccountFilter);
+  }, [homeAccountFilter, currentMonthItems]);
+  const statsItems = useMemo(() => {
+    if (statsMode === "month") {
+      const range = getMonthRange(statsMonth);
+      return transactions.filter((item) => item.date >= range.start && item.date <= range.end);
+    }
+    return transactions.filter((item) => item.date.startsWith(`${statsYear}-`));
+  }, [statsMode, statsMonth, statsYear, transactions]);
 
   return (
     <main className="app-shell">
@@ -103,7 +112,6 @@ function App() {
           <p className="eyebrow">本地账本</p>
           <h1>{titleForView(view)}</h1>
         </div>
-        <input className="month-input" type="month" value={month} onChange={(event) => setMonth(event.target.value)} />
       </header>
 
       <section className="content">
@@ -119,7 +127,19 @@ function App() {
           />
         )}
         {view === "assets" && <AssetsView items={transactions} accounts={accounts} />}
-        {view === "stats" && <StatsView items={monthItems} categories={categories} month={month} />}
+        {view === "stats" && (
+          <StatsView
+            items={statsItems}
+            categories={categories}
+            mode={statsMode}
+            setMode={setStatsMode}
+            month={statsMonth}
+            setMonth={setStatsMonth}
+            year={statsYear}
+            setYear={setStatsYear}
+            transactions={transactions}
+          />
+        )}
         {view === "settings" && <SettingsView categories={categories} transactions={transactions} />}
       </section>
 
@@ -819,7 +839,30 @@ function AssetsView({ items, accounts }: { items: Transaction[]; accounts: Accou
   );
 }
 
-function StatsView({ items, categories, month }: { items: Transaction[]; categories: ReturnType<typeof useCategories>; month: string }) {
+function StatsView({
+  items,
+  categories,
+  mode,
+  setMode,
+  month,
+  setMonth,
+  year,
+  setYear,
+  transactions,
+}: {
+  items: Transaction[];
+  categories: ReturnType<typeof useCategories>;
+  mode: "month" | "year";
+  setMode: (mode: "month" | "year") => void;
+  month: string;
+  setMonth: (month: string) => void;
+  year: string;
+  setYear: (year: string) => void;
+  transactions: Transaction[];
+}) {
+  const yearOptions = Array.from(
+    new Set([String(new Date().getFullYear()), ...transactions.map((item) => item.date.slice(0, 4))])
+  ).sort((a, b) => Number(b) - Number(a));
   const expenses = items.filter((item) => item.type === "expense");
   const data = Object.entries(
     expenses.reduce<Record<string, number>>((acc, item) => {
@@ -836,8 +879,27 @@ function StatsView({ items, categories, month }: { items: Transaction[]; categor
 
   return (
     <section className="panel stats-panel">
+      <div className="stats-controls">
+        <div className="segmented compact-segmented">
+          <button type="button" className={mode === "month" ? "selected" : ""} onClick={() => setMode("month")}>
+            按月
+          </button>
+          <button type="button" className={mode === "year" ? "selected" : ""} onClick={() => setMode("year")}>
+            按年
+          </button>
+        </div>
+        {mode === "month" ? (
+          <input className="stats-date-input" type="month" value={month} onChange={(event) => setMonth(event.target.value)} />
+        ) : (
+          <select className="stats-date-input" value={year} onChange={(event) => setYear(event.target.value)}>
+            {yearOptions.map((item) => (
+              <option key={item}>{item}</option>
+            ))}
+          </select>
+        )}
+      </div>
       <div className="section-title">
-        <h2>{month} 支出分类</h2>
+        <h2>{mode === "month" ? month : `${year} 年`} 支出分类</h2>
         <strong>{currency.format(sumByType(items, "expense"))}</strong>
       </div>
       {data.length === 0 ? (
