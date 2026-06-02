@@ -746,29 +746,15 @@ h1 {
   margin-bottom: 0;
 }
 
-.topbar .stats-controls .segmented {
-  width: 112px;
-}
-
-.topbar .stats-controls .segmented button {
+.stats-control-button {
   min-height: 34px;
+  white-space: nowrap;
   font-size: 13px;
-}
-
-.stats-date-input {
-  min-height: 40px;
-  border: 1px solid #e6ded1;
-  border-radius: 8px;
-  background: #fffaf2;
-  color: #27322f;
-  padding: 0 10px;
   font-weight: 800;
-}
-
-.topbar .stats-date-input {
-  width: 112px;
-  min-height: 34px;
-  font-size: 13px;
+  --border-radius: 7px;
+  --border-color: #2f6f5e;
+  --text-color: #fff;
+  --background-color: #2f6f5e;
 }
 
 .stats-summary {
@@ -1475,12 +1461,10 @@ h1 {
     font-size: 23px;
   }
 
-  .topbar .stats-controls .segmented {
-    width: 96px;
-  }
-
-  .topbar .stats-date-input {
-    width: 96px;
+  .stats-control-button {
+    min-height: 32px;
+    padding-inline: 8px;
+    font-size: 12px;
   }
 
   .stats-summary div {

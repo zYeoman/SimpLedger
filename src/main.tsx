@@ -120,7 +120,6 @@ function App() {
             setMonth={setStatsMonth}
             year={statsYear}
             setYear={setStatsYear}
-            transactions={transactions}
           />
         )}
       </header>
@@ -143,12 +142,8 @@ function App() {
             items={statsItems}
             categories={categories}
             mode={statsMode}
-            setMode={setStatsMode}
             month={statsMonth}
-            setMonth={setStatsMonth}
             year={statsYear}
-            setYear={setStatsYear}
-            transactions={transactions}
           />
         )}
         {view === "settings" && <SettingsView categories={categories} transactions={transactions} />}
@@ -854,22 +849,14 @@ function StatsView({
   items,
   categories,
   mode,
-  setMode,
   month,
-  setMonth,
   year,
-  setYear,
-  transactions,
 }: {
   items: Transaction[];
   categories: ReturnType<typeof useCategories>;
   mode: "month" | "year";
-  setMode: (mode: "month" | "year") => void;
   month: string;
-  setMonth: (month: string) => void;
   year: string;
-  setYear: (year: string) => void;
-  transactions: Transaction[];
 }) {
   const expenseTotal = sumByType(items, "expense");
   const incomeTotal = sumByType(items, "income");
@@ -905,7 +892,6 @@ function StatsPeriodControls({
   setMonth,
   year,
   setYear,
-  transactions,
 }: {
   mode: "month" | "year";
   setMode: (mode: "month" | "year") => void;
@@ -913,33 +899,45 @@ function StatsPeriodControls({
   setMonth: (month: string) => void;
   year: string;
   setYear: (year: string) => void;
-  transactions: Transaction[];
 }) {
-  const yearOptions = Array.from(
-    new Set([String(new Date().getFullYear()), ...transactions.map((item) => item.date.slice(0, 4))])
-  ).sort((a, b) => Number(b) - Number(a));
+  const dateValue = mode === "month" ? new Date(`${month}-01T00:00:00`) : new Date(`${year}-01-01T00:00:00`);
+  const dateLabel = mode === "month" ? formatStatsMonthLabel(month) : year;
 
   return (
     <div className="stats-controls">
-      <div className="segmented compact-segmented">
-        <button type="button" className={mode === "month" ? "selected" : ""} onClick={() => setMode("month")}>
-          按月
-        </button>
-        <button type="button" className={mode === "year" ? "selected" : ""} onClick={() => setMode("year")}>
-          按年
-        </button>
-      </div>
-      {mode === "month" ? (
-        <input className="stats-date-input" type="month" value={month} onChange={(event) => setMonth(event.target.value)} />
-      ) : (
-        <select className="stats-date-input" value={year} onChange={(event) => setYear(event.target.value)}>
-          {yearOptions.map((item) => (
-            <option key={item}>{item}</option>
-          ))}
-        </select>
-      )}
+      <Button
+        className="stats-control-button"
+        color="primary"
+        fill="solid"
+        onClick={() => setMode(mode === "month" ? "year" : "month")}
+      >
+        {mode === "month" ? "按月统计" : "按年统计"}
+      </Button>
+      <DatePicker
+        title={mode === "month" ? "选择月份" : "选择年份"}
+        precision={mode === "month" ? "month" : "year"}
+        value={dateValue}
+        onConfirm={(value) => {
+          if (mode === "month") {
+            setMonth(toDateInputValue(value).slice(0, 7));
+          } else {
+            setYear(String(value.getFullYear()));
+          }
+        }}
+      >
+        {(_, actions) => (
+          <Button className="stats-control-button" color="primary" fill="solid" onClick={actions.open}>
+            {dateLabel}
+          </Button>
+        )}
+      </DatePicker>
     </div>
   );
+}
+
+function formatStatsMonthLabel(value: string) {
+  const [year, month] = value.split("-");
+  return `${year.slice(-2)}/${month}`;
 }
 
 type CategoryStat = {
