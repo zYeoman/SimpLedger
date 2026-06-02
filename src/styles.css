@@ -801,47 +801,12 @@ h1 {
 
 .stats-chart-layout {
   display: grid;
-  grid-template-columns: minmax(130px, 0.9fr) minmax(0, 1.1fr);
-  gap: 12px;
-  align-items: center;
+  place-items: center;
 }
 
 .stats-donut {
-  width: 100%;
+  width: min(100%, 240px);
   height: 190px;
-}
-
-.stats-legend {
-  display: grid;
-  gap: 12px;
-}
-
-.stats-legend div {
-  display: grid;
-  grid-template-columns: 12px minmax(0, 1fr) auto;
-  gap: 8px;
-  align-items: center;
-}
-
-.stats-legend span {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-}
-
-.stats-legend strong {
-  min-width: 0;
-  color: #27322f;
-  overflow: hidden;
-  font-weight: 900;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.stats-legend em {
-  color: #4d5753;
-  font-style: normal;
-  font-weight: 800;
 }
 
 .stats-rank-list {
@@ -1479,21 +1444,8 @@ h1 {
     font-size: 14px;
   }
 
-  .stats-chart-layout {
-    grid-template-columns: minmax(112px, 0.9fr) minmax(0, 1.1fr);
-  }
-
   .stats-donut {
     height: 150px;
-  }
-
-  .stats-legend {
-    gap: 8px;
-  }
-
-  .stats-legend strong,
-  .stats-legend em {
-    font-size: 12px;
   }
 
   .stats-rank-row {

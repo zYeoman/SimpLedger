@@ -972,7 +972,6 @@ function buildCategoryStats(items: Transaction[], categories: ReturnType<typeof 
 
 function StatsCategorySection({ title, total, data }: { title: string; total: number; data: CategoryStat[] }) {
   const chartData = data.length ? data : [{ name: "暂无", value: 1, percent: 0, color: "#f0f1f4", icon: "wallet" }];
-  const legendItems = data.slice(0, 5);
 
   return (
     <section className="panel stats-category-panel">
@@ -996,15 +995,6 @@ function StatsCategorySection({ title, total, data }: { title: string; total: nu
                   <Tooltip formatter={(value: number) => currency.format(value)} />
                 </PieChart>
               </ResponsiveContainer>
-            </div>
-            <div className="stats-legend">
-              {legendItems.map((item) => (
-                <div key={item.name}>
-                  <span style={{ background: item.color }} />
-                  <strong>{item.name}</strong>
-                  <em>{item.percent.toFixed(2)}%</em>
-                </div>
-              ))}
             </div>
           </div>
           <div className="stats-rank-list">
