@@ -426,8 +426,8 @@ h1 {
 
 .category-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
   max-height: min(34dvh, 260px);
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -441,33 +441,36 @@ h1 {
 
 .category-grid button {
   display: grid;
-  grid-template-rows: 28px 16px;
-  place-items: center;
-  gap: 6px;
-  height: 64px;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: center;
+  justify-items: start;
+  gap: 8px;
+  height: 54px;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  padding: 7px 4px 6px;
-  border: 1px solid #e6ded1;
-  background: #fffaf2;
-  font-size: 12px;
+  padding: 6px 10px 6px 7px;
+  border: 0;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 8px 18px rgba(64, 51, 37, 0.06);
+  font-size: 14px;
   line-height: 1;
 }
 
 .category-grid span {
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
-  background: var(--swatch);
-  color: #fff;
+  background: #f0f2f5;
+  color: #38424c;
 }
 
 .category-grid span svg {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
 }
 
 .category-grid em {
@@ -479,6 +482,20 @@ h1 {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-style: normal;
+}
+
+.category-grid .selected {
+  background: #fff;
+  color: #38424c;
+}
+
+.category-grid .selected span {
+  background: var(--swatch);
+  color: #fff;
+}
+
+.category-grid .selected em {
+  color: var(--swatch);
 }
 
 .transaction-list {
