@@ -863,22 +863,13 @@ function StatsView({
   const yearOptions = Array.from(
     new Set([String(new Date().getFullYear()), ...transactions.map((item) => item.date.slice(0, 4))])
   ).sort((a, b) => Number(b) - Number(a));
-  const expenses = items.filter((item) => item.type === "expense");
-  const data = Object.entries(
-    expenses.reduce<Record<string, number>>((acc, item) => {
-      acc[item.category] = (acc[item.category] ?? 0) + item.amount;
-      return acc;
-    }, {})
-  )
-    .map(([name, value]) => ({
-      name,
-      value,
-      color: categories.find((category) => category.name === name && category.type === "expense")?.color ?? "#6f7680",
-    }))
-    .sort((a, b) => b.value - a.value);
+  const expenseTotal = sumByType(items, "expense");
+  const incomeTotal = sumByType(items, "income");
+  const expenseData = buildCategoryStats(items, categories, "expense");
+  const incomeData = buildCategoryStats(items, categories, "income");
 
   return (
-    <section className="panel stats-panel">
+    <section className="stats-page">
       <div className="stats-controls">
         <div className="segmented compact-segmented">
           <button type="button" className={mode === "month" ? "selected" : ""} onClick={() => setMode("month")}>
@@ -898,32 +889,109 @@ function StatsView({
           </select>
         )}
       </div>
-      <div className="section-title">
-        <h2>{mode === "month" ? month : `${year} 年`} 支出分类</h2>
-        <strong>{currency.format(sumByType(items, "expense"))}</strong>
+      <div className="stats-summary">
+        <div>
+          <span>支出</span>
+          <strong className="expense">{currency.format(expenseTotal)}</strong>
+        </div>
+        <div>
+          <span>收入</span>
+          <strong>{currency.format(incomeTotal)}</strong>
+        </div>
+        <div>
+          <span>结余</span>
+          <strong className={incomeTotal - expenseTotal < 0 ? "expense" : ""}>{currency.format(incomeTotal - expenseTotal)}</strong>
+        </div>
+      </div>
+      <StatsCategorySection title="支出分类" total={expenseTotal} data={expenseData} />
+      <StatsCategorySection title="收入分类" total={incomeTotal} data={incomeData} />
+    </section>
+  );
+}
+
+type CategoryStat = {
+  name: string;
+  value: number;
+  percent: number;
+  color: string;
+  icon?: string;
+};
+
+function buildCategoryStats(items: Transaction[], categories: ReturnType<typeof useCategories>, type: TransactionType): CategoryStat[] {
+  const typedItems = items.filter((item) => item.type === type);
+  const total = sumByType(typedItems, type);
+  return Object.entries(
+    typedItems.reduce<Record<string, number>>((acc, item) => {
+      acc[item.category] = (acc[item.category] ?? 0) + item.amount;
+      return acc;
+    }, {})
+  )
+    .map(([name, value]) => {
+      const category = categories.find((item) => item.name === name && item.type === type);
+      return {
+        name,
+        value,
+        percent: total ? (value / total) * 100 : 0,
+        color: category?.color ?? "#6f7680",
+        icon: category?.icon ?? "wallet",
+      };
+    })
+    .sort((a, b) => b.value - a.value);
+}
+
+function StatsCategorySection({ title, total, data }: { title: string; total: number; data: CategoryStat[] }) {
+  const chartData = data.length ? data : [{ name: "暂无", value: 1, percent: 0, color: "#f0f1f4", icon: "wallet" }];
+  const legendItems = data.slice(0, 5);
+
+  return (
+    <section className="panel stats-category-panel">
+      <div className="section-title stats-section-title">
+        <h2>{title}</h2>
+        <strong>{currency.format(total)}</strong>
       </div>
       {data.length === 0 ? (
         <EmptyState />
       ) : (
         <>
-          <div className="chart-box">
-            <ResponsiveContainer width="100%" height={260}>
-              <PieChart>
-                <Pie data={data} dataKey="value" innerRadius={62} outerRadius={104} paddingAngle={2}>
-                  {data.map((entry) => (
-                    <Cell key={entry.name} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value: number) => currency.format(value)} />
-              </PieChart>
-            </ResponsiveContainer>
+          <div className="stats-chart-layout">
+            <div className="stats-donut">
+              <ResponsiveContainer width="100%" height={190}>
+                <PieChart>
+                  <Pie data={chartData} dataKey="value" innerRadius={46} outerRadius={78} paddingAngle={2}>
+                    {chartData.map((entry) => (
+                      <Cell key={entry.name} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value: number) => currency.format(value)} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="stats-legend">
+              {legendItems.map((item) => (
+                <div key={item.name}>
+                  <span style={{ background: item.color }} />
+                  <strong>{item.name}</strong>
+                  <em>{item.percent.toFixed(2)}%</em>
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="rank-list">
+          <div className="stats-rank-list">
             {data.map((item) => (
-              <div className="rank-row" key={item.name}>
-                <span style={{ background: item.color }} />
-                <strong>{item.name}</strong>
-                <em>{currency.format(item.value)}</em>
+              <div className="stats-rank-row" key={item.name}>
+                <div className="stats-rank-icon" style={{ "--swatch": item.color } as React.CSSProperties}>
+                  <CategoryIcon icon={item.icon} />
+                </div>
+                <div>
+                  <div className="stats-rank-title">
+                    <strong>{item.name}</strong>
+                    <span>{formatAmountPlain(item.value)}</span>
+                  </div>
+                  <div className="stats-progress">
+                    <i style={{ width: `${Math.max(item.percent, 3)}%`, background: item.color }} />
+                  </div>
+                </div>
+                <em>{item.percent.toFixed(2)}%</em>
               </div>
             ))}
           </div>
