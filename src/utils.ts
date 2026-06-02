@@ -38,20 +38,6 @@ export function getMonthRange(key: string) {
   };
 }
 
-export function addMonthsToKey(key: string, offset: number) {
-  const [year, month] = key.split("-").map(Number);
-  return monthKey(new Date(year, month - 1 + offset, 1));
-}
-
-export function getMonthWindowRange(count: number, base = monthKey()) {
-  const safeCount = Math.max(1, count);
-  const startMonth = addMonthsToKey(base, 1 - safeCount);
-  return {
-    start: getMonthRange(startMonth).start,
-    end: getMonthRange(base).end,
-  };
-}
-
 export function sumByType(items: Transaction[], type: TransactionType) {
   return items.filter((item) => item.type === type).reduce((sum, item) => sum + item.amount, 0);
 }

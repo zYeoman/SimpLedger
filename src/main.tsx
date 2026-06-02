@@ -84,7 +84,7 @@ import {
 } from "lucide-react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { db, defaultAccounts, exportBackup, importBackup, seedCategories, type Account, type BackupPayload, type Transaction, type TransactionType } from "./db";
-import { currency, fileSafeStamp, getMonthRange, getMonthWindowRange, groupByDate, monthKey, sumByType, todayInputValue } from "./utils";
+import { currency, fileSafeStamp, getMonthRange, groupByDate, monthKey, sumByType, todayInputValue } from "./utils";
 import "./styles.css";
 
 type View = "home" | "assets" | "stats" | "settings";
@@ -105,22 +105,14 @@ function App() {
   const [statsMonth, setStatsMonth] = useState(monthKey());
   const [statsYear, setStatsYear] = useState(String(new Date().getFullYear()));
   const [homeAccountFilter, setHomeAccountFilter] = useState("all");
-  const [homeMonthCount, setHomeMonthCount] = useState(1);
   const [isSeedReady, setIsSeedReady] = useState(false);
   const categoryRows = useLiveQuery(() => db.categories.orderBy("type").toArray(), []);
   const accountRows = useLiveQuery(() => db.accounts.orderBy("createdAt").toArray(), []);
-  const transactionRows = useLiveQuery(() => {
-    if (view === "home") {
-      const range = getMonthWindowRange(homeMonthCount);
-      return db.transactions.where("date").between(range.start, range.end, true, true).reverse().toArray();
-    }
-    return db.transactions.orderBy("date").reverse().toArray();
-  }, [view, homeMonthCount]);
+  const transactionRows = useLiveQuery(() => db.transactions.orderBy("date").reverse().toArray(), []);
   const categories = categoryRows ?? [];
   const accounts = accountRows ?? [];
   const transactions = transactionRows ?? [];
   const isDataReady = isSeedReady && categoryRows !== undefined && accountRows !== undefined && transactionRows !== undefined;
-  const isLoadingHomeMoreRef = useRef(false);
 
   useEffect(() => {
     let isActive = true;
@@ -138,25 +130,6 @@ function App() {
   useEffect(() => {
     isEntryOpenRef.current = isEntryOpen;
   }, [isEntryOpen]);
-
-  useEffect(() => {
-    isLoadingHomeMoreRef.current = false;
-  }, [transactionRows]);
-
-  useEffect(() => {
-    if (view !== "home" || !isDataReady) return;
-    function loadMoreWhenNearBottom() {
-      if (isLoadingHomeMoreRef.current) return;
-      const scrollBottom = window.scrollY + window.innerHeight;
-      const pageBottom = document.documentElement.scrollHeight;
-      if (scrollBottom < pageBottom - 420) return;
-      isLoadingHomeMoreRef.current = true;
-      setHomeMonthCount((count) => count + 1);
-    }
-    window.addEventListener("scroll", loadMoreWhenNearBottom, { passive: true });
-    loadMoreWhenNearBottom();
-    return () => window.removeEventListener("scroll", loadMoreWhenNearBottom);
-  }, [view, isDataReady]);
 
   useEffect(() => {
     function handlePopState() {
@@ -346,13 +319,24 @@ function HomeView({
         <div className="section-title">
           <h2>明细</h2>
         </div>
-        {detailItems.length === 0 ? <EmptyState /> : <MonthlyTransactionList items={detailItems} categories={categories} goEdit={goEdit} />}
+        {detailItems.length === 0 ? <EmptyState /> : <VirtualTransactionList items={detailItems} categories={categories} goEdit={goEdit} />}
       </section>
     </>
   );
 }
 
-function MonthlyTransactionList({
+type VirtualTransactionRow =
+  | { type: "month"; key: string; month: string }
+  | { type: "date"; key: string; date: string; records: Transaction[] }
+  | { type: "transaction"; key: string; item: Transaction };
+
+const virtualRowHeights: Record<VirtualTransactionRow["type"], number> = {
+  month: 42,
+  date: 58,
+  transaction: 88,
+};
+
+function VirtualTransactionList({
   items,
   categories,
   goEdit,
@@ -361,27 +345,163 @@ function MonthlyTransactionList({
   categories: ReturnType<typeof useCategories>;
   goEdit: (transaction: Transaction) => void;
 }) {
-  const groups = items.reduce<Record<string, Transaction[]>>((result, item) => {
-    const key = item.date.slice(0, 7);
-    result[key] = result[key] ?? [];
-    result[key].push(item);
+  const [selectedItem, setSelectedItem] = useState<Transaction | null>(null);
+  const [viewport, setViewport] = useState({ scrollY: 0, height: 0, top: 0 });
+  const listRef = useRef<HTMLDivElement>(null);
+
+  const rows = useMemo(() => {
+    const dateGroups = groupByDate(items);
+    const result: VirtualTransactionRow[] = [];
+    let currentMonth = "";
+    let currentDate = "";
+    for (const item of items) {
+      const month = item.date.slice(0, 7);
+      if (month !== currentMonth) {
+        currentMonth = month;
+        result.push({ type: "month", key: `month-${month}`, month });
+        currentDate = "";
+      }
+      if (item.date !== currentDate) {
+        currentDate = item.date;
+        result.push({ type: "date", key: `date-${item.date}`, date: item.date, records: dateGroups[item.date] ?? [] });
+      }
+      result.push({ type: "transaction", key: `transaction-${item.id ?? `${item.date}-${result.length}`}`, item });
+    }
     return result;
-  }, {});
-  const months = Object.keys(groups).sort((a, b) => b.localeCompare(a));
+  }, [items]);
+
+  const offsets = useMemo(() => {
+    let offset = 0;
+    return rows.map((row) => {
+      const top = offset;
+      offset += virtualRowHeights[row.type];
+      return top;
+    });
+  }, [rows]);
+
+  const totalHeight = rows.reduce((sum, row) => sum + virtualRowHeights[row.type], 0);
+  const visibleTop = Math.max(0, viewport.scrollY - viewport.top - 700);
+  const visibleBottom = Math.max(0, viewport.scrollY - viewport.top + viewport.height + 900);
+  const visibleRows = rows
+    .map((row, index) => ({ row, index, top: offsets[index] }))
+    .filter(({ row, top }) => top + virtualRowHeights[row.type] >= visibleTop && top <= visibleBottom);
+
+  useEffect(() => {
+    function updateViewport() {
+      const rect = listRef.current?.getBoundingClientRect();
+      setViewport({
+        scrollY: window.scrollY,
+        height: window.innerHeight,
+        top: rect ? rect.top + window.scrollY : 0,
+      });
+    }
+    updateViewport();
+    window.addEventListener("scroll", updateViewport, { passive: true });
+    window.addEventListener("resize", updateViewport);
+    return () => {
+      window.removeEventListener("scroll", updateViewport);
+      window.removeEventListener("resize", updateViewport);
+    };
+  }, [rows.length]);
+
+  function selectItem(item: Transaction) {
+    if (!item.id) return;
+    setSelectedItem(item);
+  }
+
+  async function deleteItem(id: number) {
+    await db.transactions.delete(id);
+    setSelectedItem(null);
+  }
 
   return (
-    <div className="month-detail-stack">
-      {months.map((month) => (
-        <section className="month-detail-card" key={month}>
-          <div className="section-title month-detail-title">
-            <h3>{formatMonthTitle(month)}</h3>
-            <span>{groups[month].length} 笔</span>
+    <>
+      <div ref={listRef} className="virtual-transaction-list" style={{ height: totalHeight }}>
+        {visibleRows.map(({ row, top }) => (
+          <div className={`virtual-transaction-row ${row.type}`} key={row.key} style={{ transform: `translateY(${top}px)` }}>
+            {row.type === "month" && <div className="virtual-month-title">{formatMonthTitle(row.month)}</div>}
+            {row.type === "date" && <DateHeader date={row.date} records={row.records} />}
+            {row.type === "transaction" && <VirtualTransactionItem item={row.item} categories={categories} onSelect={selectItem} />}
           </div>
-          <TransactionList items={groups[month]} categories={categories} goEdit={goEdit} />
-        </section>
-      ))}
-      <div className="load-more-hint">继续下滑加载更早月份</div>
-    </div>
+        ))}
+      </div>
+      {selectedItem?.id && (
+        <div className="detail-overlay" role="presentation">
+          <button className="detail-backdrop" aria-label="关闭详情" onClick={() => setSelectedItem(null)} />
+          <section className="detail-card floating" role="dialog" aria-modal="true" aria-label="账单详情">
+            <div className="detail-grid">
+              <span>类型</span>
+              <strong>{typeLabel[selectedItem.type]}</strong>
+              <span>金额</span>
+              <strong>{currency.format(selectedItem.amount)}</strong>
+              <span>分类</span>
+              <strong>{selectedItem.category}</strong>
+              <span>账户</span>
+              <strong>{selectedItem.account || defaultAccounts[0]}</strong>
+              <span>日期</span>
+              <strong>{selectedItem.date}</strong>
+              <span>备注</span>
+              <strong>{selectedItem.note || "无"}</strong>
+            </div>
+            <div className="detail-actions">
+              <button type="button" className="secondary-button danger-button" onClick={() => deleteItem(selectedItem.id!)}>
+                删除
+              </button>
+              <button
+                type="button"
+                className="primary-button"
+                onClick={() => {
+                  const item = selectedItem;
+                  setSelectedItem(null);
+                  goEdit(item);
+                }}
+              >
+                修改
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+    </>
+  );
+}
+
+function VirtualTransactionItem({
+  item,
+  categories,
+  onSelect,
+}: {
+  item: Transaction;
+  categories: ReturnType<typeof useCategories>;
+  onSelect: (transaction: Transaction) => void;
+}) {
+  const meta = getCategoryMeta(item, categories);
+  return (
+    <article className="transaction-row clickable timeline-row" onClick={() => onSelect(item)}>
+      <time>{formatRecordTime(item)}</time>
+      <div className="timeline-dot" />
+      <div
+        className="transaction-pill"
+        style={
+          {
+            "--row-bg": softColor(meta.color),
+            "--row-fg": meta.color,
+          } as React.CSSProperties
+        }
+      >
+        <div className="category-icon">
+          <CategoryIcon icon={meta.icon} />
+        </div>
+        <div className="row-main">
+          <strong>{item.category}</strong>
+          <span>{[item.account, item.note].filter(Boolean).join(" · ") || typeLabel[item.type]}</span>
+        </div>
+        <div className={`row-amount ${item.type}`}>
+          {item.type === "expense" ? "-" : "+"}
+          {currency.format(item.amount).replace("¥", "")}
+        </div>
+      </div>
+    </article>
   );
 }
 

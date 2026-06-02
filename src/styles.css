@@ -501,40 +501,37 @@ h1 {
   color: var(--swatch);
 }
 
-.month-detail-stack {
-  display: grid;
-  gap: 14px;
+.virtual-transaction-list {
+  position: relative;
+  min-height: 160px;
 }
 
-.month-detail-card {
+.virtual-transaction-row {
+  position: absolute;
+  right: 0;
+  left: 0;
+  top: 0;
+  will-change: transform;
+}
+
+.virtual-transaction-row.month {
+  height: 42px;
+}
+
+.virtual-transaction-row.date {
+  height: 58px;
+}
+
+.virtual-transaction-row.transaction {
+  height: 88px;
+}
+
+.virtual-month-title {
   border-top: 1px solid #eadfce;
-  padding-top: 12px;
-}
-
-.month-detail-card:first-child {
-  border-top: 0;
-  padding-top: 0;
-}
-
-.month-detail-title {
-  margin-bottom: 10px;
-}
-
-.month-detail-title h3 {
   color: #27322f;
+  padding-top: 12px;
   font-size: 16px;
-}
-
-.month-detail-title span,
-.load-more-hint {
-  color: #7b837f;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.load-more-hint {
-  padding: 4px 0 0;
-  text-align: center;
+  font-weight: 900;
 }
 
 .transaction-list {
