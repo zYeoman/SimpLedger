@@ -428,6 +428,15 @@ h1 {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 8px;
+  max-height: min(34dvh, 260px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 2px;
+  scrollbar-width: none;
+}
+
+.category-grid::-webkit-scrollbar {
+  display: none;
 }
 
 .category-grid button {
@@ -1318,6 +1327,7 @@ h1 {
 
   .category-grid {
     grid-template-columns: repeat(3, 1fr);
+    max-height: min(30dvh, 220px);
   }
 
   .category-add-form {
