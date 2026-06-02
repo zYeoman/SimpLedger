@@ -246,15 +246,9 @@ function HomeView({
           </button>
         ))}
       </div>
-      <section className="summary-band">
-        <div>
-          <span>本月结余</span>
-          <strong>{currency.format(income - expense)}</strong>
-        </div>
-      </section>
       <section className="metric-grid">
-        <Metric icon={<ArrowDownCircle />} label="支出" value={currency.format(expense)} tone="expense" />
-        <Metric icon={<ArrowUpCircle />} label="收入" value={currency.format(income)} tone="income" />
+        <Metric label="本月支出" value={currency.format(expense)} tone="expense" />
+        <Metric label="本月收入" value={currency.format(income)} tone="income" />
       </section>
       <section className="panel">
         <div className="section-title">
@@ -266,10 +260,10 @@ function HomeView({
   );
 }
 
-function Metric({ icon, label, value, tone }: { icon: React.ReactNode; label: string; value: string; tone: string }) {
+function Metric({ icon, label, value, tone }: { icon?: React.ReactNode; label: string; value: string; tone: string }) {
   return (
     <div className={`metric ${tone}`}>
-      <div>{icon}</div>
+      {icon && <div>{icon}</div>}
       <span>{label}</span>
       <strong>{value}</strong>
     </div>

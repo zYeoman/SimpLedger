@@ -183,6 +183,7 @@ h1 {
 }
 
 .metric.expense svg,
+.metric.expense strong,
 .row-amount.expense {
   color: #c94f3f;
 }
