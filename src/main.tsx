@@ -109,7 +109,6 @@ function App() {
     <main className="app-shell">
       <header className={`topbar ${view === "stats" ? "stats-topbar" : ""}`}>
         <div>
-          <p className="eyebrow">本地账本</p>
           <h1>{titleForView(view)}</h1>
         </div>
         {view === "stats" && (
@@ -905,14 +904,6 @@ function StatsPeriodControls({
 
   return (
     <div className="stats-controls">
-      <Button
-        className="stats-control-button"
-        color="primary"
-        fill="solid"
-        onClick={() => setMode(mode === "month" ? "year" : "month")}
-      >
-        {mode === "month" ? "按月统计" : "按年统计"}
-      </Button>
       <DatePicker
         title={mode === "month" ? "选择月份" : "选择年份"}
         precision={mode === "month" ? "month" : "year"}
@@ -931,6 +922,14 @@ function StatsPeriodControls({
           </Button>
         )}
       </DatePicker>
+      <Button
+        className="stats-control-button"
+        color="primary"
+        fill="solid"
+        onClick={() => setMode(mode === "month" ? "year" : "month")}
+      >
+        {mode === "month" ? "按月统计" : "按年统计"}
+      </Button>
     </div>
   );
 }
