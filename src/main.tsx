@@ -304,6 +304,89 @@ function transactionBelongsToAccount(item: Transaction, account: string) {
   return (item.account || defaultAccounts[0]) === account || (item.type === "transfer" && item.toAccount === account);
 }
 
+function useHistoryBackedPopup(visible: boolean, setVisible: (visible: boolean) => void, stateKey: string) {
+  const visibleRef = useRef(visible);
+  const pushedRef = useRef(false);
+
+  useEffect(() => {
+    visibleRef.current = visible;
+    if (visible && !pushedRef.current) {
+      const currentState = window.history.state && typeof window.history.state === "object" ? window.history.state : {};
+      window.history.pushState({ ...currentState, [stateKey]: true }, "", window.location.href);
+      pushedRef.current = true;
+    }
+  }, [visible, stateKey]);
+
+  useEffect(() => {
+    function handlePopState(event: PopStateEvent) {
+      const state = event.state && typeof event.state === "object" ? event.state : {};
+      if (visibleRef.current && !state[stateKey]) {
+        visibleRef.current = false;
+        pushedRef.current = false;
+        setVisible(false);
+      }
+    }
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [setVisible, stateKey]);
+
+  return () => {
+    if (pushedRef.current) {
+      window.history.back();
+      return;
+    }
+    visibleRef.current = false;
+    setVisible(false);
+  };
+}
+
+type BackedPickerProps = Omit<React.ComponentProps<typeof Picker>, "visible" | "onClose"> & {
+  historyKey: string;
+};
+
+function BackedPicker({ historyKey, children, ...props }: BackedPickerProps) {
+  const [visible, setVisible] = useState(false);
+  const close = useHistoryBackedPopup(visible, setVisible, historyKey);
+
+  return (
+    <Picker {...props} visible={visible} onClose={close}>
+      {children
+        ? (items, actions) =>
+            children(items, {
+              ...actions,
+              open: () => setVisible(true),
+              close,
+              toggle: () => (visible ? close() : setVisible(true)),
+            })
+        : undefined}
+    </Picker>
+  );
+}
+
+type BackedDatePickerProps = Omit<React.ComponentProps<typeof DatePicker>, "visible" | "onClose"> & {
+  historyKey: string;
+};
+
+function BackedDatePicker({ historyKey, children, ...props }: BackedDatePickerProps) {
+  const [visible, setVisible] = useState(false);
+  const close = useHistoryBackedPopup(visible, setVisible, historyKey);
+
+  return (
+    <DatePicker {...props} visible={visible} onClose={close}>
+      {children
+        ? (value, actions) =>
+            children(value, {
+              ...actions,
+              open: () => setVisible(true),
+              close,
+              toggle: () => (visible ? close() : setVisible(true)),
+            })
+        : undefined}
+    </DatePicker>
+  );
+}
+
 function HomeView({
   items,
   detailItems,
@@ -374,6 +457,9 @@ function VirtualTransactionList({
   goEdit: (transaction: Transaction) => void;
 }) {
   const [selectedItem, setSelectedItem] = useState<Transaction | null>(null);
+  const closeSelectedItem = useHistoryBackedPopup(Boolean(selectedItem), (visible) => {
+    if (!visible) setSelectedItem(null);
+  }, "localMoneyVirtualTransactionDetail");
   const [viewport, setViewport] = useState({ scrollY: 0, height: 0, top: 0 });
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -439,7 +525,7 @@ function VirtualTransactionList({
 
   async function deleteItem(id: number) {
     await db.transactions.delete(id);
-    setSelectedItem(null);
+    closeSelectedItem();
   }
 
   return (
@@ -455,7 +541,7 @@ function VirtualTransactionList({
       </div>
       {selectedItem?.id && (
         <div className="detail-overlay" role="presentation">
-          <button className="detail-backdrop" aria-label="关闭详情" onClick={() => setSelectedItem(null)} />
+          <button className="detail-backdrop" aria-label="关闭详情" onClick={closeSelectedItem} />
           <section className="detail-card floating" role="dialog" aria-modal="true" aria-label="账单详情">
             <div className="detail-grid">
               <span>类型</span>
@@ -486,8 +572,8 @@ function VirtualTransactionList({
                 className="primary-button"
                 onClick={() => {
                   const item = selectedItem;
-                  setSelectedItem(null);
-                  goEdit(item);
+                  closeSelectedItem();
+                  window.setTimeout(() => goEdit(item), 80);
                 }}
               >
                 修改
@@ -694,20 +780,20 @@ function EntryForm({
 
       {type === "transfer" ? (
         <div className="transfer-account-grid">
-          <Picker columns={accountColumns} value={[account]} onConfirm={(value) => setAccount(String(value[0]))}>
+          <BackedPicker historyKey="localMoneyEntryTransferFromPicker" columns={accountColumns} value={[account]} onConfirm={(value) => setAccount(String(value[0]))}>
             {(_, actions) => (
               <Button className="transfer-account-button" color="primary" fill="solid" onClick={actions.open}>
                 转出 {account}
               </Button>
             )}
-          </Picker>
-          <Picker columns={accountColumns} value={[toAccount]} onConfirm={(value) => setToAccount(String(value[0]))}>
+          </BackedPicker>
+          <BackedPicker historyKey="localMoneyEntryTransferToPicker" columns={accountColumns} value={[toAccount]} onConfirm={(value) => setToAccount(String(value[0]))}>
             {(_, actions) => (
               <Button className="transfer-account-button" color="primary" fill="solid" onClick={actions.open}>
                 转入 {toAccount}
               </Button>
             )}
-          </Picker>
+          </BackedPicker>
         </div>
       ) : (
         <div className="category-grid">
@@ -732,23 +818,23 @@ function EntryForm({
         <div className="entry-meta-grid">
           <div className="meta-left">
             <div className="choice-wrap">
-              <DatePicker title="选择日期" value={dateValue} onConfirm={(value) => setDate(toDateInputValue(value))}>
+              <BackedDatePicker historyKey="localMoneyEntryDatePicker" title="选择日期" value={dateValue} onConfirm={(value) => setDate(toDateInputValue(value))}>
                 {(_, actions) => (
                   <Button className="choice-button" color="primary" fill="solid" onClick={actions.open}>
                     {dateLabel}
                   </Button>
                 )}
-              </DatePicker>
+              </BackedDatePicker>
             </div>
             {type !== "transfer" && (
               <div className="choice-wrap">
-                <Picker columns={accountColumns} value={[account]} onConfirm={(value) => setAccount(String(value[0]))}>
+                <BackedPicker historyKey="localMoneyEntryAccountPicker" columns={accountColumns} value={[account]} onConfirm={(value) => setAccount(String(value[0]))}>
                   {(_, actions) => (
                     <Button className="choice-button" color="primary" fill="solid" onClick={actions.open}>
                       {account}
                     </Button>
                   )}
-                </Picker>
+                </BackedPicker>
               </div>
             )}
           </div>
@@ -863,6 +949,9 @@ function TransactionList({
   compact?: boolean;
 }) {
   const [selectedItem, setSelectedItem] = useState<Transaction | null>(null);
+  const closeSelectedItem = useHistoryBackedPopup(Boolean(selectedItem), (visible) => {
+    if (!visible) setSelectedItem(null);
+  }, "localMoneyTransactionDetail");
   const groups = groupByDate(items);
 
   function selectItem(item: Transaction) {
@@ -872,7 +961,7 @@ function TransactionList({
 
   async function deleteItem(id: number) {
     await db.transactions.delete(id);
-    setSelectedItem(null);
+    closeSelectedItem();
   }
 
   return (
@@ -920,7 +1009,7 @@ function TransactionList({
       </div>
       {selectedItem?.id && (
         <div className="detail-overlay" role="presentation">
-          <button className="detail-backdrop" aria-label="关闭详情" onClick={() => setSelectedItem(null)} />
+          <button className="detail-backdrop" aria-label="关闭详情" onClick={closeSelectedItem} />
           <section className="detail-card floating" role="dialog" aria-modal="true" aria-label="账单详情">
             <div className="detail-grid">
               <span>类型</span>
@@ -951,8 +1040,8 @@ function TransactionList({
                 className="primary-button"
                 onClick={() => {
                   const item = selectedItem;
-                  setSelectedItem(null);
-                  goEdit(item);
+                  closeSelectedItem();
+                  window.setTimeout(() => goEdit(item), 80);
                 }}
               >
                 修改
@@ -1374,7 +1463,8 @@ function StatsPeriodControls({
 
   return (
     <div className="stats-controls">
-      <DatePicker
+      <BackedDatePicker
+        historyKey="localMoneyStatsDatePicker"
         title={mode === "month" ? "选择月份" : "选择年份"}
         precision={mode === "month" ? "month" : "year"}
         value={dateValue}
@@ -1391,7 +1481,7 @@ function StatsPeriodControls({
             {dateLabel}
           </Button>
         )}
-      </DatePicker>
+      </BackedDatePicker>
       <Button
         className="stats-control-button"
         color="primary"
@@ -1513,6 +1603,9 @@ function SettingsView({
   const [isAccountSettingsOpen, setIsAccountSettingsOpen] = useState(false);
   const [isTransferRulesOpen, setIsTransferRulesOpen] = useState(false);
   const [isCategorySettingsOpen, setIsCategorySettingsOpen] = useState(false);
+  const closeAccountSettings = useHistoryBackedPopup(isAccountSettingsOpen, setIsAccountSettingsOpen, "localMoneyAccountSettings");
+  const closeTransferRules = useHistoryBackedPopup(isTransferRulesOpen, setIsTransferRulesOpen, "localMoneyRecurringRules");
+  const closeCategorySettings = useHistoryBackedPopup(isCategorySettingsOpen, setIsCategorySettingsOpen, "localMoneyCategorySettings");
 
   async function downloadBackup() {
     const payload = await exportBackup();
@@ -1601,13 +1694,13 @@ function SettingsView({
           </button>
         </div>
       </div>
-      <Popup visible={isAccountSettingsOpen} onMaskClick={() => setIsAccountSettingsOpen(false)} bodyClassName="management-popup">
+      <Popup visible={isAccountSettingsOpen} onMaskClick={closeAccountSettings} bodyClassName="management-popup">
         <AccountSettingsPanel accounts={accounts} transactions={transactions} transferRules={transferRules} />
       </Popup>
-      <Popup visible={isTransferRulesOpen} onMaskClick={() => setIsTransferRulesOpen(false)} bodyClassName="management-popup">
+      <Popup visible={isTransferRulesOpen} onMaskClick={closeTransferRules} bodyClassName="management-popup">
         <RecurringRulesPanel accounts={accounts} categories={categories} transferRules={transferRules} />
       </Popup>
-      <Popup visible={isCategorySettingsOpen} onMaskClick={() => setIsCategorySettingsOpen(false)} bodyClassName="management-popup">
+      <Popup visible={isCategorySettingsOpen} onMaskClick={closeCategorySettings} bodyClassName="management-popup">
         <CategorySettingsPanel categories={categories} transactions={transactions} />
       </Popup>
     </section>
@@ -1708,6 +1801,7 @@ function RecurringRulesPanel({
   transferRules: TransferRule[];
 }) {
   const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const closeEditor = useHistoryBackedPopup(isEditorOpen, setIsEditorOpen, "localMoneyRecurringEditor");
 
   return (
     <div className="management-panel">
@@ -1737,8 +1831,8 @@ function RecurringRulesPanel({
           ))
         )}
       </div>
-      <Popup visible={isEditorOpen} onMaskClick={() => setIsEditorOpen(false)} bodyClassName="management-popup recurring-editor-popup">
-        <RecurringRuleEditor accounts={accounts} categories={categories} onDone={() => setIsEditorOpen(false)} />
+      <Popup visible={isEditorOpen} onMaskClick={closeEditor} bodyClassName="management-popup recurring-editor-popup">
+        <RecurringRuleEditor accounts={accounts} categories={categories} onDone={closeEditor} />
       </Popup>
     </div>
   );
@@ -1837,40 +1931,40 @@ function RecurringRuleEditor({
         </label>
         <div className="recurring-choice-grid">
           {type !== "transfer" && (
-            <Picker columns={categoryColumns} value={[category]} onConfirm={(value) => setCategory(String(value[0]))}>
+            <BackedPicker historyKey="localMoneyRecurringCategoryPicker" columns={categoryColumns} value={[category]} onConfirm={(value) => setCategory(String(value[0]))}>
               {(_, actions) => (
                 <Button className="recurring-choice-button" color="primary" fill="solid" onClick={actions.open}>
                   {category || "选择分类"}
                 </Button>
               )}
-            </Picker>
+            </BackedPicker>
           )}
-          <Picker columns={accountColumns} value={[account]} onConfirm={(value) => setAccount(String(value[0]))}>
+          <BackedPicker historyKey="localMoneyRecurringAccountPicker" columns={accountColumns} value={[account]} onConfirm={(value) => setAccount(String(value[0]))}>
             {(_, actions) => (
               <Button className="recurring-choice-button" color="primary" fill="solid" onClick={actions.open}>
                 {type === "transfer" ? `转出 ${account}` : account || "选择账户"}
               </Button>
             )}
-          </Picker>
+          </BackedPicker>
           {type === "transfer" && (
-            <Picker columns={accountColumns} value={[toAccount]} onConfirm={(value) => setToAccount(String(value[0]))}>
+            <BackedPicker historyKey="localMoneyRecurringToAccountPicker" columns={accountColumns} value={[toAccount]} onConfirm={(value) => setToAccount(String(value[0]))}>
               {(_, actions) => (
                 <Button className="recurring-choice-button" color="primary" fill="solid" onClick={actions.open}>
                   转入 {toAccount || "选择账户"}
                 </Button>
               )}
-            </Picker>
+            </BackedPicker>
           )}
         </div>
         <div className="recurring-field">
           <span>重复</span>
-          <Picker columns={frequencyColumns} value={[frequency]} onConfirm={(value) => setFrequency(value[0] as RecurringFrequency)}>
+          <BackedPicker historyKey="localMoneyRecurringFrequencyPicker" columns={frequencyColumns} value={[frequency]} onConfirm={(value) => setFrequency(value[0] as RecurringFrequency)}>
             {(_, actions) => (
               <Button className="recurring-choice-button" color="primary" fill="solid" onClick={actions.open}>
                 {recurringFrequencyLabel[frequency]}
               </Button>
             )}
-          </Picker>
+          </BackedPicker>
         </div>
         {(frequency === "weekly" || frequency === "monthly" || frequency === "yearly") && (
           <label className="recurring-field">
@@ -1879,20 +1973,20 @@ function RecurringRuleEditor({
           </label>
         )}
         <div className="recurring-date-grid">
-          <DatePicker title="开始日期" value={startDateValue} onConfirm={(value) => setStartDate(toDateInputValue(value))}>
+          <BackedDatePicker historyKey="localMoneyRecurringStartDatePicker" title="开始日期" value={startDateValue} onConfirm={(value) => setStartDate(toDateInputValue(value))}>
             {(_, actions) => (
               <Button className="recurring-choice-button" color="primary" fill="solid" onClick={actions.open}>
                 开始 {formatEntryDateLabel(startDate)}
               </Button>
             )}
-          </DatePicker>
-          <DatePicker title="结束日期" value={endDateValue} onConfirm={(value) => setEndDate(toDateInputValue(value))}>
+          </BackedDatePicker>
+          <BackedDatePicker historyKey="localMoneyRecurringEndDatePicker" title="结束日期" value={endDateValue} onConfirm={(value) => setEndDate(toDateInputValue(value))}>
             {(_, actions) => (
               <Button className="recurring-choice-button" color="primary" fill="solid" onClick={actions.open}>
                 {endDate ? `结束 ${formatEntryDateLabel(endDate)}` : "无结束日期"}
               </Button>
             )}
-          </DatePicker>
+          </BackedDatePicker>
         </div>
         {endDate && (
           <button type="button" className="recurring-clear-button" onClick={() => setEndDate("")}>
@@ -2028,6 +2122,7 @@ function CategorySettingsPanel({ categories, transactions }: { categories: Retur
 
 function IconPicker({ value, color, onChange }: { value: string; color: string; onChange: (value: string) => void }) {
   const [visible, setVisible] = useState(false);
+  const close = useHistoryBackedPopup(visible, setVisible, "localMoneyIconPicker");
 
   return (
     <>
@@ -2040,7 +2135,7 @@ function IconPicker({ value, color, onChange }: { value: string; color: string; 
       >
         <CategoryIcon icon={value} />
       </button>
-      <Popup visible={visible} onMaskClick={() => setVisible(false)} bodyClassName="icon-picker-popup">
+      <Popup visible={visible} onMaskClick={close} bodyClassName="icon-picker-popup">
         <div className="popup-title">选择图标</div>
         <div className="icon-picker-panel">
           {categoryIconOptions.map((option) => (
@@ -2052,7 +2147,7 @@ function IconPicker({ value, color, onChange }: { value: string; color: string; 
               aria-label={option.label}
               onClick={() => {
                 onChange(option.value);
-                setVisible(false);
+                close();
               }}
             >
               <CategoryIcon icon={option.value} />
@@ -2067,6 +2162,7 @@ function IconPicker({ value, color, onChange }: { value: string; color: string; 
 
 function ColorPicker({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   const [visible, setVisible] = useState(false);
+  const close = useHistoryBackedPopup(visible, setVisible, "localMoneyColorPicker");
 
   return (
     <>
@@ -2077,7 +2173,7 @@ function ColorPicker({ value, onChange }: { value: string; onChange: (value: str
         style={{ backgroundColor: value }}
         onClick={() => setVisible(true)}
       />
-      <Popup visible={visible} onMaskClick={() => setVisible(false)} bodyClassName="color-picker-popup">
+      <Popup visible={visible} onMaskClick={close} bodyClassName="color-picker-popup">
         <div className="popup-title">选择颜色</div>
         <div className="color-picker-panel">
           {categoryColorOptions.map((color) => (
@@ -2089,7 +2185,7 @@ function ColorPicker({ value, onChange }: { value: string; onChange: (value: str
               style={{ "--swatch": color } as React.CSSProperties}
               onClick={() => {
                 onChange(color);
-                setVisible(false);
+                close();
               }}
             />
           ))}
