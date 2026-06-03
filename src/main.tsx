@@ -1259,10 +1259,22 @@ function AssetsView({ items, accounts }: { items: Transaction[]; accounts: Accou
                 <strong className={row.balance < 0 ? "negative" : ""}>{currency.format(row.balance)}</strong>
               </div>
               <div className="asset-flow-line">
-                <span>收入 {formatAmountPlain(row.income)}</span>
-                <span>支出 {formatAmountPlain(row.expense)}</span>
-                <span>转入 {formatAmountPlain(row.transferIn)}</span>
-                <span>转出 {formatAmountPlain(row.transferOut)}</span>
+                <span>
+                  <em>收入</em>
+                  <strong>{formatAmountPlain(row.income)}</strong>
+                </span>
+                <span>
+                  <em>支出</em>
+                  <strong>{formatAmountPlain(row.expense)}</strong>
+                </span>
+                <span>
+                  <em>转入</em>
+                  <strong>{formatAmountPlain(row.transferIn)}</strong>
+                </span>
+                <span>
+                  <em>转出</em>
+                  <strong>{formatAmountPlain(row.transferOut)}</strong>
+                </span>
               </div>
               <div className="asset-progress" aria-hidden="true">
                 <i style={{ width: `${totalAbsBalance ? Math.max((Math.abs(row.balance) / totalAbsBalance) * 100, 4) : 0}%` }} />

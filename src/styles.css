@@ -1524,19 +1524,35 @@ h1 {
 .asset-flow-line {
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
 }
 
 .asset-flow-line span {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
   min-width: 0;
   border-radius: 6px;
   background: #f7f3ec;
   color: #5f6965;
-  padding: 6px 4px;
+  padding: 7px 8px;
   font-size: 12px;
   font-weight: 800;
-  text-align: center;
+}
+
+.asset-flow-line em {
+  color: #77807b;
+  font-style: normal;
+}
+
+.asset-flow-line strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #27322f;
+  font-size: 12px;
+  text-align: right;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -1674,10 +1690,6 @@ h1 {
 
   .summary-band strong {
     font-size: 26px;
-  }
-
-  .asset-flow-line {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .row-amount {
