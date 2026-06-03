@@ -1838,7 +1838,7 @@ function IconPicker({ value, color, onChange }: { value: string; color: string; 
         type="button"
         className="icon-picker-trigger"
         aria-label="选择图标"
-        style={{ "--swatch": color } as React.CSSProperties}
+        style={{ backgroundColor: color }}
         onClick={() => setVisible(true)}
       >
         <CategoryIcon icon={value} />
