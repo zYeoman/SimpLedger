@@ -1903,9 +1903,14 @@ function RecurringRuleEditor({
           <span>备注</span>
           <input placeholder="备注" value={note} onChange={(event) => setNote(event.target.value)} />
         </label>
-        <Button block color="primary" fill="solid" type="submit" className="recurring-submit-button">
-          保存
-        </Button>
+        <div className="recurring-action-row">
+          <Button block fill="outline" type="button" className="recurring-cancel-button" onClick={onDone}>
+            取消
+          </Button>
+          <Button block color="primary" fill="solid" type="submit" className="recurring-submit-button">
+            保存
+          </Button>
+        </div>
       </form>
     </div>
   );
