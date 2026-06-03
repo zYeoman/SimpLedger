@@ -219,6 +219,56 @@ h1 {
   gap: 14px;
 }
 
+.settings-action-list {
+  display: grid;
+  gap: 10px;
+}
+
+.settings-action-button {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 50px;
+  border: 1px solid #e6ded1;
+  border-radius: 8px;
+  background: #fffaf2;
+  color: #27322f;
+  padding: 0 12px;
+  text-align: left;
+}
+
+.settings-action-button span {
+  font-weight: 900;
+}
+
+.settings-action-button em {
+  color: #77807b;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.management-popup {
+  display: flex;
+  max-height: min(82dvh, 680px);
+  flex-direction: column;
+  border-radius: 16px 16px 0 0;
+  background: #f7f3ec;
+  padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+}
+
+.management-panel {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.management-panel::-webkit-scrollbar {
+  display: none;
+}
+
 .entry-form {
   height: calc(100dvh - 80px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
   min-height: 0;
@@ -1364,6 +1414,33 @@ h1 {
   font-size: 12px;
 }
 
+.account-settings-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid #e6ded1;
+  border-radius: 8px;
+  background: #fff;
+  padding: 12px;
+}
+
+.account-settings-row strong,
+.account-settings-row span {
+  display: block;
+}
+
+.account-settings-row strong {
+  color: #27322f;
+  font-size: 15px;
+}
+
+.account-settings-row span {
+  margin-top: 4px;
+  color: #77807b;
+  font-size: 12px;
+}
+
 .compact-empty {
   min-height: 72px;
 }
@@ -1401,6 +1478,16 @@ h1 {
 
 .asset-row .negative {
   color: #c94f3f;
+}
+
+.asset-kind-badge {
+  justify-self: end;
+  border-radius: 999px;
+  background: #e8f0e8;
+  color: #2f6f5e !important;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 900;
 }
 
 .asset-actions {
@@ -1499,6 +1586,16 @@ h1 {
 
   .category-add-form {
     grid-template-columns: 1fr 72px;
+  }
+
+  .asset-add-form,
+  .transfer-rule-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .asset-add-form input,
+  .transfer-rule-form select {
+    grid-column: 1 / -1;
   }
 
   .icon-picker-panel {

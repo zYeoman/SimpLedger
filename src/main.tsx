@@ -214,7 +214,7 @@ function App() {
             goEdit={openEntryPage}
           />
         )}
-        {isDataReady && view === "assets" && <AssetsView items={transactions} accounts={accounts} transferRules={transferRules} />}
+        {isDataReady && view === "assets" && <AssetsView items={transactions} accounts={accounts} />}
         {isDataReady && view === "stats" && (
           <StatsView
             items={statsItems}
@@ -225,7 +225,9 @@ function App() {
             year={statsYear}
           />
         )}
-        {isDataReady && view === "settings" && <SettingsView categories={categories} transactions={transactions} />}
+        {isDataReady && view === "settings" && (
+          <SettingsView categories={categories} transactions={transactions} accounts={accounts} transferRules={transferRules} />
+        )}
       </section>
 
       {isEntryOpen && (
@@ -1194,16 +1196,10 @@ function softColor(hex: string) {
   )})`;
 }
 
-function AssetsView({ items, accounts, transferRules }: { items: Transaction[]; accounts: Account[]; transferRules: TransferRule[] }) {
-  const [newAccount, setNewAccount] = useState("");
-  const [newAccountKind, setNewAccountKind] = useState<AccountKind>("cash");
-  const [ruleFromAccount, setRuleFromAccount] = useState(defaultAccounts[0]);
-  const [ruleToAccount, setRuleToAccount] = useState("");
-  const [ruleAmount, setRuleAmount] = useState("");
+function AssetsView({ items, accounts }: { items: Transaction[]; accounts: Account[] }) {
   const accountRecords: Account[] = accounts.length
     ? accounts
     : defaultAccounts.map((name) => ({ name, kind: inferAccountKind(name), createdAt: "" }));
-  const accountNames = accountRecords.map((item) => item.name);
   const rows = accountRecords.map((accountRecord) => {
     const account = accountRecord.name;
     const accountItems = items.filter((item) => transactionBelongsToAccount(item, account));
@@ -1225,45 +1221,6 @@ function AssetsView({ items, accounts, transferRules }: { items: Transaction[]; 
   });
   const total = rows.reduce((sum, item) => sum + item.balance, 0);
 
-  useEffect(() => {
-    if (!accountNames.includes(ruleFromAccount)) {
-      setRuleFromAccount(accountNames[0] ?? "");
-    }
-    if (!ruleToAccount || !accountNames.includes(ruleToAccount) || ruleToAccount === ruleFromAccount) {
-      setRuleToAccount(accountNames.find((name) => name !== (accountNames[0] ?? "")) ?? accountNames[0] ?? "");
-    }
-  }, [accountNames.join("|"), ruleFromAccount, ruleToAccount]);
-
-  async function addAccount(event: React.FormEvent) {
-    event.preventDefault();
-    const name = newAccount.trim();
-    if (!name || accountNames.includes(name)) return;
-    await db.accounts.add({ name, kind: newAccountKind, createdAt: new Date().toISOString() });
-    setNewAccount("");
-  }
-
-  async function deleteAccount(id: number | undefined, count: number) {
-    if (!id || count > 0) return;
-    await db.accounts.delete(id);
-  }
-
-  async function addTransferRule(event: React.FormEvent) {
-    event.preventDefault();
-    const amount = Number(ruleAmount);
-    if (!amount || amount <= 0 || !ruleFromAccount || !ruleToAccount || ruleFromAccount === ruleToAccount) return;
-    await db.transferRules.add({
-      fromAccount: ruleFromAccount,
-      toAccount: ruleToAccount,
-      amount: Math.round(amount * 100) / 100,
-      frequency: "daily",
-      startDate: todayInputValue(),
-      enabled: true,
-      createdAt: new Date().toISOString(),
-    });
-    setRuleAmount("");
-    await applyAutoTransfers();
-  }
-
   return (
     <section className="settings-stack">
       <div className="summary-band asset-summary">
@@ -1277,22 +1234,12 @@ function AssetsView({ items, accounts, transferRules }: { items: Transaction[]; 
           <h2>账户汇总</h2>
           <span>按已记录收支计算</span>
         </div>
-        <form className="asset-add-form" onSubmit={addAccount}>
-          <input placeholder="新增资产账户" value={newAccount} onChange={(event) => setNewAccount(event.target.value)} />
-          <select value={newAccountKind} onChange={(event) => setNewAccountKind(event.target.value as AccountKind)}>
-            <option value="cash">{accountKindLabel.cash}</option>
-            <option value="investment">{accountKindLabel.investment}</option>
-          </select>
-          <button type="submit">添加</button>
-        </form>
         <div className="asset-list">
           {rows.map((row) => (
             <article className="asset-row" key={row.account}>
               <div>
                 <strong>{row.account}</strong>
-                <span>
-                  {accountKindLabel[row.kind]} · {row.count} 笔记录
-                </span>
+                <span>{row.count} 笔记录</span>
               </div>
               <div>
                 <strong className={row.balance < 0 ? "negative" : ""}>{currency.format(row.balance)}</strong>
@@ -1300,76 +1247,9 @@ function AssetsView({ items, accounts, transferRules }: { items: Transaction[]; 
                   收入 {currency.format(row.income)} · 支出 {currency.format(row.expense)} · 转入 {currency.format(row.transferIn)} · 转出 {currency.format(row.transferOut)}
                 </span>
               </div>
-              <div className="asset-actions">
-                <select
-                  className="asset-kind-select"
-                  value={row.kind}
-                  disabled={!row.id}
-                  onChange={(event) => row.id && db.accounts.update(row.id, { kind: event.target.value as AccountKind })}
-                >
-                  <option value="cash">{accountKindLabel.cash}</option>
-                  <option value="investment">{accountKindLabel.investment}</option>
-                </select>
-                <button className="asset-delete" disabled={row.count > 0} onClick={() => deleteAccount(row.id, row.count)}>
-                  删除
-                </button>
-              </div>
+              <span className="asset-kind-badge">{accountKindLabel[row.kind]}</span>
             </article>
           ))}
-        </div>
-      </div>
-      <div className="panel">
-        <div className="section-title">
-          <h2>自动划转</h2>
-          <span>每天执行</span>
-        </div>
-        <form className="transfer-rule-form" onSubmit={addTransferRule}>
-          <select value={ruleFromAccount} onChange={(event) => setRuleFromAccount(event.target.value)}>
-            {accountNames.map((name) => (
-              <option value={name} key={name}>
-                从 {name}
-              </option>
-            ))}
-          </select>
-          <select value={ruleToAccount} onChange={(event) => setRuleToAccount(event.target.value)}>
-            {accountNames.map((name) => (
-              <option value={name} key={name}>
-                到 {name}
-              </option>
-            ))}
-          </select>
-          <input inputMode="decimal" placeholder="金额" value={ruleAmount} onChange={(event) => setRuleAmount(event.target.value)} />
-          <button type="submit">添加</button>
-        </form>
-        <div className="transfer-rule-list">
-          {transferRules.length === 0 ? (
-            <div className="empty-state compact-empty">暂无自动划转</div>
-          ) : (
-            transferRules.map((rule) => (
-              <article className="transfer-rule-row" key={rule.id}>
-                <div>
-                  <strong>
-                    {rule.fromAccount} → {rule.toAccount}
-                  </strong>
-                  <span>
-                    每天 {currency.format(rule.amount)} · 已执行到 {rule.lastRunDate || rule.startDate}
-                  </span>
-                </div>
-                <div className="asset-actions">
-                  <button
-                    type="button"
-                    className="asset-delete"
-                    onClick={() => rule.id && db.transferRules.update(rule.id, { enabled: !rule.enabled })}
-                  >
-                    {rule.enabled ? "停用" : "启用"}
-                  </button>
-                  <button type="button" className="asset-delete" onClick={() => rule.id && db.transferRules.delete(rule.id)}>
-                    删除
-                  </button>
-                </div>
-              </article>
-            ))
-          )}
         </div>
       </div>
     </section>
@@ -1584,13 +1464,22 @@ function StatsCategorySection({ title, total, data }: { title: string; total: nu
   );
 }
 
-function SettingsView({ categories, transactions }: { categories: ReturnType<typeof useCategories>; transactions: Transaction[] }) {
+function SettingsView({
+  categories,
+  transactions,
+  accounts,
+  transferRules,
+}: {
+  categories: ReturnType<typeof useCategories>;
+  transactions: Transaction[];
+  accounts: Account[];
+  transferRules: TransferRule[];
+}) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [updateStatus, setUpdateStatus] = useState("");
-  const [newCategoryName, setNewCategoryName] = useState("");
-  const [newCategoryType, setNewCategoryType] = useState<TransactionType>("expense");
-  const [newCategoryColor, setNewCategoryColor] = useState("#6f7680");
-  const [newCategoryIcon, setNewCategoryIcon] = useState("wallet");
+  const [isAccountSettingsOpen, setIsAccountSettingsOpen] = useState(false);
+  const [isTransferRulesOpen, setIsTransferRulesOpen] = useState(false);
+  const [isCategorySettingsOpen, setIsCategorySettingsOpen] = useState(false);
 
   async function downloadBackup() {
     const payload = await exportBackup();
@@ -1608,21 +1497,6 @@ function SettingsView({ categories, transactions }: { categories: ReturnType<typ
     const payload = JSON.parse(await file.text()) as BackupPayload;
     await importBackup(payload);
     event.target.value = "";
-  }
-
-  async function addCategory(event: React.FormEvent) {
-    event.preventDefault();
-    const name = newCategoryName.trim();
-    if (!name) return;
-    const exists = categories.some((category) => category.name === name && category.type === newCategoryType);
-    if (exists) return;
-    await db.categories.add({
-      name,
-      type: newCategoryType,
-      color: newCategoryColor,
-      icon: newCategoryIcon,
-    });
-    setNewCategoryName("");
   }
 
   async function checkForUpdates() {
@@ -1674,52 +1548,252 @@ function SettingsView({ categories, transactions }: { categories: ReturnType<typ
       </div>
       <div className="panel">
         <div className="section-title">
-          <h2>分类</h2>
-          <span>{categories.length} 个</span>
+          <h2>管理</h2>
         </div>
-        <form className="category-add-form" onSubmit={addCategory}>
-          <input placeholder="新增分类" value={newCategoryName} onChange={(event) => setNewCategoryName(event.target.value)} />
-          <select value={newCategoryType} onChange={(event) => setNewCategoryType(event.target.value as TransactionType)}>
-            <option value="expense">支出</option>
-            <option value="income">收入</option>
-          </select>
-          <ColorPicker value={newCategoryColor} onChange={setNewCategoryColor} />
-          <IconPicker value={newCategoryIcon} color={newCategoryColor} onChange={setNewCategoryIcon} />
-          <button type="submit">添加</button>
-        </form>
-        <div className="category-editor-list">
-          {categories.map((category) => {
-            const usageCount = transactions.filter((item) => item.category === category.name && item.type === category.type).length;
-            return (
-              <div className="category-editor-row" key={`${category.type}-${category.name}`}>
-                <IconPicker
-                  value={category.icon || "wallet"}
-                  color={category.color}
-                  onChange={(icon) => category.id && db.categories.update(category.id, { icon })}
-                />
-                <div>
-                  <strong>{category.name}</strong>
-                  <span>
-                    {typeLabel[category.type]} · {usageCount} 笔
-                  </span>
-                </div>
-                <ColorPicker
-                  value={category.color}
-                  onChange={(color) => category.id && db.categories.update(category.id, { color })}
-                />
-                <button
-                  type="button"
-                  className="category-delete"
-                  onClick={() => category.id && db.categories.delete(category.id)}
+        <div className="settings-action-list">
+          <button type="button" className="settings-action-button" onClick={() => setIsAccountSettingsOpen(true)}>
+            <Wallet size={18} />
+            <span>账户设置</span>
+            <em>{accounts.length || defaultAccounts.length} 个</em>
+          </button>
+          <button type="button" className="settings-action-button" onClick={() => setIsTransferRulesOpen(true)}>
+            <ArrowRightLeft size={18} />
+            <span>自动划转</span>
+            <em>{transferRules.length} 条</em>
+          </button>
+          <button type="button" className="settings-action-button" onClick={() => setIsCategorySettingsOpen(true)}>
+            <Tags size={18} />
+            <span>分类设置</span>
+            <em>{categories.length} 个</em>
+          </button>
+        </div>
+      </div>
+      <Popup visible={isAccountSettingsOpen} onMaskClick={() => setIsAccountSettingsOpen(false)} bodyClassName="management-popup">
+        <AccountSettingsPanel accounts={accounts} transactions={transactions} transferRules={transferRules} />
+      </Popup>
+      <Popup visible={isTransferRulesOpen} onMaskClick={() => setIsTransferRulesOpen(false)} bodyClassName="management-popup">
+        <TransferRulesPanel accounts={accounts} transferRules={transferRules} />
+      </Popup>
+      <Popup visible={isCategorySettingsOpen} onMaskClick={() => setIsCategorySettingsOpen(false)} bodyClassName="management-popup">
+        <CategorySettingsPanel categories={categories} transactions={transactions} />
+      </Popup>
+    </section>
+  );
+}
+
+function AccountSettingsPanel({
+  accounts,
+  transactions,
+  transferRules,
+}: {
+  accounts: Account[];
+  transactions: Transaction[];
+  transferRules: TransferRule[];
+}) {
+  const [newAccount, setNewAccount] = useState("");
+  const [newAccountKind, setNewAccountKind] = useState<AccountKind>("cash");
+  const accountRecords: Account[] = accounts.length
+    ? accounts
+    : defaultAccounts.map((name) => ({ name, kind: inferAccountKind(name), createdAt: "" }));
+  const accountNames = accountRecords.map((item) => item.name);
+
+  async function addAccount(event: React.FormEvent) {
+    event.preventDefault();
+    const name = newAccount.trim();
+    if (!name || accountNames.includes(name)) return;
+    await db.accounts.add({ name, kind: newAccountKind, createdAt: new Date().toISOString() });
+    setNewAccount("");
+  }
+
+  async function deleteAccount(id: number | undefined, dependencyCount: number) {
+    if (!id || dependencyCount > 0) return;
+    await db.accounts.delete(id);
+  }
+
+  return (
+    <div className="management-panel">
+      <div className="popup-title">账户设置</div>
+      <form className="asset-add-form" onSubmit={addAccount}>
+        <input placeholder="新增资产账户" value={newAccount} onChange={(event) => setNewAccount(event.target.value)} />
+        <select value={newAccountKind} onChange={(event) => setNewAccountKind(event.target.value as AccountKind)}>
+          <option value="cash">{accountKindLabel.cash}</option>
+          <option value="investment">{accountKindLabel.investment}</option>
+        </select>
+        <button type="submit">添加</button>
+      </form>
+      <div className="asset-list">
+        {accountRecords.map((account) => {
+          const usageCount = transactions.filter((item) => transactionBelongsToAccount(item, account.name)).length;
+          const ruleCount = transferRules.filter((rule) => rule.fromAccount === account.name || rule.toAccount === account.name).length;
+          const dependencyCount = usageCount + ruleCount;
+          return (
+            <article className="account-settings-row" key={account.name}>
+              <div>
+                <strong>{account.name}</strong>
+                <span>
+                  {usageCount} 笔记录 · {ruleCount} 条规则
+                </span>
+              </div>
+              <div className="asset-actions">
+                <select
+                  className="asset-kind-select"
+                  value={accountKindOf(account)}
+                  disabled={!account.id}
+                  onChange={(event) => account.id && db.accounts.update(account.id, { kind: event.target.value as AccountKind })}
                 >
+                  <option value="cash">{accountKindLabel.cash}</option>
+                  <option value="investment">{accountKindLabel.investment}</option>
+                </select>
+                <button type="button" className="asset-delete" disabled={dependencyCount > 0} onClick={() => deleteAccount(account.id, dependencyCount)}>
                   删除
                 </button>
               </div>
-            );
-          })}
-        </div>
+            </article>
+          );
+        })}
       </div>
-    </section>
+    </div>
+  );
+}
+
+function TransferRulesPanel({ accounts, transferRules }: { accounts: Account[]; transferRules: TransferRule[] }) {
+  const accountNames = accounts.length ? accounts.map((item) => item.name) : defaultAccounts;
+  const [ruleFromAccount, setRuleFromAccount] = useState(accountNames[0] ?? "");
+  const [ruleToAccount, setRuleToAccount] = useState(accountNames.find((item) => item !== (accountNames[0] ?? "")) ?? accountNames[0] ?? "");
+  const [ruleAmount, setRuleAmount] = useState("");
+
+  useEffect(() => {
+    if (!accountNames.includes(ruleFromAccount)) {
+      setRuleFromAccount(accountNames[0] ?? "");
+    }
+    if (!ruleToAccount || !accountNames.includes(ruleToAccount) || ruleToAccount === ruleFromAccount) {
+      setRuleToAccount(accountNames.find((name) => name !== (ruleFromAccount || accountNames[0] || "")) ?? accountNames[0] ?? "");
+    }
+  }, [accountNames.join("|"), ruleFromAccount, ruleToAccount]);
+
+  async function addTransferRule(event: React.FormEvent) {
+    event.preventDefault();
+    const amount = Number(ruleAmount);
+    if (!amount || amount <= 0 || !ruleFromAccount || !ruleToAccount || ruleFromAccount === ruleToAccount) return;
+    await db.transferRules.add({
+      fromAccount: ruleFromAccount,
+      toAccount: ruleToAccount,
+      amount: Math.round(amount * 100) / 100,
+      frequency: "daily",
+      startDate: todayInputValue(),
+      enabled: true,
+      createdAt: new Date().toISOString(),
+    });
+    setRuleAmount("");
+    await applyAutoTransfers();
+  }
+
+  return (
+    <div className="management-panel">
+      <div className="popup-title">自动划转</div>
+      <form className="transfer-rule-form" onSubmit={addTransferRule}>
+        <select value={ruleFromAccount} onChange={(event) => setRuleFromAccount(event.target.value)}>
+          {accountNames.map((name) => (
+            <option value={name} key={name}>
+              从 {name}
+            </option>
+          ))}
+        </select>
+        <select value={ruleToAccount} onChange={(event) => setRuleToAccount(event.target.value)}>
+          {accountNames.map((name) => (
+            <option value={name} key={name}>
+              到 {name}
+            </option>
+          ))}
+        </select>
+        <input inputMode="decimal" placeholder="金额" value={ruleAmount} onChange={(event) => setRuleAmount(event.target.value)} />
+        <button type="submit">添加</button>
+      </form>
+      <div className="transfer-rule-list">
+        {transferRules.length === 0 ? (
+          <div className="empty-state compact-empty">暂无自动划转</div>
+        ) : (
+          transferRules.map((rule) => (
+            <article className="transfer-rule-row" key={rule.id}>
+              <div>
+                <strong>
+                  {rule.fromAccount} → {rule.toAccount}
+                </strong>
+                <span>
+                  每天 {currency.format(rule.amount)} · 已执行到 {rule.lastRunDate || rule.startDate}
+                </span>
+              </div>
+              <div className="asset-actions">
+                <button type="button" className="asset-delete" onClick={() => rule.id && db.transferRules.update(rule.id, { enabled: !rule.enabled })}>
+                  {rule.enabled ? "停用" : "启用"}
+                </button>
+                <button type="button" className="asset-delete" onClick={() => rule.id && db.transferRules.delete(rule.id)}>
+                  删除
+                </button>
+              </div>
+            </article>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CategorySettingsPanel({ categories, transactions }: { categories: ReturnType<typeof useCategories>; transactions: Transaction[] }) {
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [newCategoryType, setNewCategoryType] = useState<TransactionType>("expense");
+  const [newCategoryColor, setNewCategoryColor] = useState("#6f7680");
+  const [newCategoryIcon, setNewCategoryIcon] = useState("wallet");
+
+  async function addCategory(event: React.FormEvent) {
+    event.preventDefault();
+    const name = newCategoryName.trim();
+    if (!name) return;
+    const exists = categories.some((category) => category.name === name && category.type === newCategoryType);
+    if (exists) return;
+    await db.categories.add({
+      name,
+      type: newCategoryType,
+      color: newCategoryColor,
+      icon: newCategoryIcon,
+    });
+    setNewCategoryName("");
+  }
+
+  return (
+    <div className="management-panel">
+      <div className="popup-title">分类设置</div>
+      <form className="category-add-form" onSubmit={addCategory}>
+        <input placeholder="新增分类" value={newCategoryName} onChange={(event) => setNewCategoryName(event.target.value)} />
+        <select value={newCategoryType} onChange={(event) => setNewCategoryType(event.target.value as TransactionType)}>
+          <option value="expense">支出</option>
+          <option value="income">收入</option>
+        </select>
+        <ColorPicker value={newCategoryColor} onChange={setNewCategoryColor} />
+        <IconPicker value={newCategoryIcon} color={newCategoryColor} onChange={setNewCategoryIcon} />
+        <button type="submit">添加</button>
+      </form>
+      <div className="category-editor-list">
+        {categories.map((category) => {
+          const usageCount = transactions.filter((item) => item.category === category.name && item.type === category.type).length;
+          return (
+            <div className="category-editor-row" key={`${category.type}-${category.name}`}>
+              <IconPicker value={category.icon || "wallet"} color={category.color} onChange={(icon) => category.id && db.categories.update(category.id, { icon })} />
+              <div>
+                <strong>{category.name}</strong>
+                <span>
+                  {typeLabel[category.type]} · {usageCount} 笔
+                </span>
+              </div>
+              <ColorPicker value={category.color} onChange={(color) => category.id && db.categories.update(category.id, { color })} />
+              <button type="button" className="category-delete" onClick={() => category.id && db.categories.delete(category.id)}>
+                删除
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
