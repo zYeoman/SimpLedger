@@ -1231,15 +1231,10 @@ function AssetsView({ items, accounts }: { items: Transaction[]; accounts: Accou
           <span>总资产</span>
           <strong>{currency.format(total)}</strong>
         </div>
-        <div className="asset-summary-breakdown">
-          <span>现金 {currency.format(cashTotal)}</span>
-          <span>理财 {currency.format(investmentTotal)}</span>
-        </div>
       </div>
       <div className="panel">
         <div className="section-title">
           <h2>账户汇总</h2>
-          <span>按已记录收支计算</span>
         </div>
         <div className="asset-list">
           {rows.map((row) => {
