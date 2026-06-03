@@ -1737,7 +1737,7 @@ function RecurringRulesPanel({
           ))
         )}
       </div>
-      <Popup visible={isEditorOpen} onMaskClick={() => setIsEditorOpen(false)} bodyClassName="management-popup">
+      <Popup visible={isEditorOpen} onMaskClick={() => setIsEditorOpen(false)} bodyClassName="management-popup recurring-editor-popup">
         <RecurringRuleEditor accounts={accounts} categories={categories} onDone={() => setIsEditorOpen(false)} />
       </Popup>
     </div>
@@ -1765,6 +1765,11 @@ function RecurringRuleEditor({
   const [startDate, setStartDate] = useState(todayInputValue());
   const [endDate, setEndDate] = useState("");
   const [note, setNote] = useState("");
+  const categoryColumns = [typeCategories.map((item) => ({ label: item.name, value: item.name }))];
+  const accountColumns = [accountNames.map((name) => ({ label: name, value: name }))];
+  const frequencyColumns = [Object.entries(recurringFrequencyLabel).map(([value, label]) => ({ label, value }))];
+  const startDateValue = new Date(`${startDate}T00:00:00`);
+  const endDateValue = new Date(`${endDate || startDate}T00:00:00`);
 
   useEffect(() => {
     if (type === "transfer") return;
@@ -1812,58 +1817,95 @@ function RecurringRuleEditor({
     <div className="management-panel">
       <div className="popup-title">新建周期记账</div>
       <form className="recurring-rule-form" onSubmit={addRecurringRule}>
-        <div className="segmented compact-segmented">
-          <button type="button" className={type === "expense" ? "selected" : ""} onClick={() => setType("expense")}>
-            支出
-          </button>
-          <button type="button" className={type === "income" ? "selected" : ""} onClick={() => setType("income")}>
-            收入
-          </button>
-          <button type="button" className={type === "transfer" ? "selected" : ""} onClick={() => setType("transfer")}>
-            转账
-          </button>
+        <div className="recurring-field">
+          <span>类型</span>
+          <div className="segmented compact-segmented">
+            <button type="button" className={type === "expense" ? "selected" : ""} onClick={() => setType("expense")}>
+              支出
+            </button>
+            <button type="button" className={type === "income" ? "selected" : ""} onClick={() => setType("income")}>
+              收入
+            </button>
+            <button type="button" className={type === "transfer" ? "selected" : ""} onClick={() => setType("transfer")}>
+              转账
+            </button>
+          </div>
         </div>
-        <input inputMode="decimal" placeholder="金额" value={amount} onChange={(event) => setAmount(event.target.value)} />
-        {type !== "transfer" && (
-          <select value={category} onChange={(event) => setCategory(event.target.value)}>
-            {typeCategories.map((item) => (
-              <option value={item.name} key={`${item.type}-${item.name}`}>
-                {item.name}
-              </option>
-            ))}
-          </select>
-        )}
-        <select value={account} onChange={(event) => setAccount(event.target.value)}>
-          {accountNames.map((name) => (
-            <option value={name} key={name}>
-              {type === "transfer" ? `转出 ${name}` : name}
-            </option>
-          ))}
-        </select>
+        <label className="recurring-field">
+          <span>金额</span>
+          <input inputMode="decimal" placeholder="0.00" value={amount} onChange={(event) => setAmount(event.target.value)} />
+        </label>
+        <div className="recurring-choice-grid">
+          {type !== "transfer" && (
+            <Picker columns={categoryColumns} value={[category]} onConfirm={(value) => setCategory(String(value[0]))}>
+              {(_, actions) => (
+                <Button className="recurring-choice-button" color="primary" fill="solid" onClick={actions.open}>
+                  {category || "选择分类"}
+                </Button>
+              )}
+            </Picker>
+          )}
+          <Picker columns={accountColumns} value={[account]} onConfirm={(value) => setAccount(String(value[0]))}>
+            {(_, actions) => (
+              <Button className="recurring-choice-button" color="primary" fill="solid" onClick={actions.open}>
+                {type === "transfer" ? `转出 ${account}` : account || "选择账户"}
+              </Button>
+            )}
+          </Picker>
+        </div>
         {type === "transfer" && (
-          <select value={toAccount} onChange={(event) => setToAccount(event.target.value)}>
-            {accountNames.map((name) => (
-              <option value={name} key={name}>
-                转入 {name}
-              </option>
-            ))}
-          </select>
+          <Picker columns={accountColumns} value={[toAccount]} onConfirm={(value) => setToAccount(String(value[0]))}>
+            {(_, actions) => (
+              <Button className="recurring-choice-button" color="primary" fill="solid" onClick={actions.open}>
+                转入 {toAccount || "选择账户"}
+              </Button>
+            )}
+          </Picker>
         )}
-        <select value={frequency} onChange={(event) => setFrequency(event.target.value as RecurringFrequency)}>
-          <option value="daily">每天</option>
-          <option value="weekday">工作日</option>
-          <option value="weekend">节假日</option>
-          <option value="weekly">每周</option>
-          <option value="monthly">每月</option>
-          <option value="yearly">每年</option>
-        </select>
-        {frequency === "weekly" && <input placeholder="周几，0=周日，1-6=周一到周六，可填多个如 1,3,5" value={daysText} onChange={(event) => setDaysText(event.target.value)} />}
-        {frequency === "monthly" && <input placeholder="每月几号，可填多个如 1,15,28" value={daysText} onChange={(event) => setDaysText(event.target.value)} />}
-        {frequency === "yearly" && <input placeholder="每年日期，格式 MMDD，可填多个如 0101,1001" value={daysText} onChange={(event) => setDaysText(event.target.value)} />}
-        <input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
-        <input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
-        <input placeholder="备注" value={note} onChange={(event) => setNote(event.target.value)} />
-        <button type="submit">保存</button>
+        <div className="recurring-field">
+          <span>重复</span>
+          <Picker columns={frequencyColumns} value={[frequency]} onConfirm={(value) => setFrequency(value[0] as RecurringFrequency)}>
+            {(_, actions) => (
+              <Button className="recurring-choice-button" color="primary" fill="solid" onClick={actions.open}>
+                {recurringFrequencyLabel[frequency]}
+              </Button>
+            )}
+          </Picker>
+        </div>
+        {(frequency === "weekly" || frequency === "monthly" || frequency === "yearly") && (
+          <label className="recurring-field">
+            <span>{frequency === "weekly" ? "周几" : frequency === "monthly" ? "几号" : "日期"}</span>
+            <input placeholder={recurringDaysPlaceholder(frequency)} value={daysText} onChange={(event) => setDaysText(event.target.value)} />
+          </label>
+        )}
+        <div className="recurring-date-grid">
+          <DatePicker title="开始日期" value={startDateValue} onConfirm={(value) => setStartDate(toDateInputValue(value))}>
+            {(_, actions) => (
+              <Button className="recurring-choice-button" color="primary" fill="solid" onClick={actions.open}>
+                开始 {formatEntryDateLabel(startDate)}
+              </Button>
+            )}
+          </DatePicker>
+          <DatePicker title="结束日期" value={endDateValue} onConfirm={(value) => setEndDate(toDateInputValue(value))}>
+            {(_, actions) => (
+              <Button className="recurring-choice-button" color="primary" fill="solid" onClick={actions.open}>
+                {endDate ? `结束 ${formatEntryDateLabel(endDate)}` : "无结束日期"}
+              </Button>
+            )}
+          </DatePicker>
+        </div>
+        {endDate && (
+          <button type="button" className="recurring-clear-button" onClick={() => setEndDate("")}>
+            清除结束日期
+          </button>
+        )}
+        <label className="recurring-field">
+          <span>备注</span>
+          <input placeholder="备注" value={note} onChange={(event) => setNote(event.target.value)} />
+        </label>
+        <Button block color="primary" fill="solid" type="submit" className="recurring-submit-button">
+          保存
+        </Button>
       </form>
     </div>
   );
@@ -1879,6 +1921,13 @@ function parseRecurringDays(frequency: RecurringFrequency, value: string) {
   if (frequency === "monthly") return values.filter((item) => item >= 1 && item <= 31);
   if (frequency === "yearly") return values.filter((item) => item >= 101 && item <= 1231);
   return undefined;
+}
+
+function recurringDaysPlaceholder(frequency: RecurringFrequency) {
+  if (frequency === "weekly") return "如 1,3,5；0=周日";
+  if (frequency === "monthly") return "如 1,15,28";
+  if (frequency === "yearly") return "如 0101,1001";
+  return "";
 }
 
 function formatRecurringRuleTitle(rule: TransferRule) {

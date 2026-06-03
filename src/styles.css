@@ -273,6 +273,12 @@ h1 {
   display: none;
 }
 
+.recurring-editor-popup {
+  height: 100dvh;
+  max-height: none;
+  border-radius: 0;
+}
+
 .entry-form {
   height: calc(100dvh - 80px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
   min-height: 0;
@@ -1402,7 +1408,61 @@ h1 {
 
 .recurring-rule-form {
   display: grid;
+  gap: 12px;
+}
+
+.recurring-field {
+  display: grid;
+  gap: 8px;
+  border: 1px solid #e6ded1;
+  border-radius: 8px;
+  background: #fffaf2;
+  padding: 10px;
+}
+
+.recurring-field > span {
+  color: #77807b;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.recurring-field input {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font-size: 16px;
+}
+
+.recurring-choice-grid,
+.recurring-date-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+}
+
+.recurring-choice-button {
+  width: 100%;
+  min-height: 44px;
+  --border-radius: 8px;
+  --border-color: #2f6f5e;
+  --text-color: #fff;
+  --background-color: #2f6f5e;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.recurring-clear-button {
+  min-height: 36px;
+  border-radius: 8px;
+  background: #f4e7e4;
+  color: #b84438;
+  font-weight: 900;
+}
+
+.recurring-submit-button {
+  --border-radius: 8px;
+  min-height: 46px;
+  font-weight: 900;
 }
 
 .compact-segmented {
