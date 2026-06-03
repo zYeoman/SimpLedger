@@ -1382,8 +1382,6 @@ h1 {
 .asset-add-form input,
 .asset-add-form select,
 .asset-kind-select,
-.recurring-rule-form input,
-.recurring-rule-form select,
 .transfer-rule-form input,
 .transfer-rule-form select {
   min-width: 0;
@@ -1395,7 +1393,6 @@ h1 {
 }
 
 .asset-add-form button,
-.recurring-rule-form button,
 .transfer-rule-form button,
 .asset-delete {
   min-height: 42px;
@@ -1429,9 +1426,15 @@ h1 {
 .recurring-field input {
   min-height: 38px;
   border: 0;
+  outline: 0;
   background: transparent;
   padding: 0;
   font-size: 16px;
+}
+
+.recurring-field input:focus {
+  outline: 0;
+  box-shadow: none;
 }
 
 .recurring-choice-grid,
