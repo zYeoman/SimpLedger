@@ -97,6 +97,7 @@ import {
   type Account,
   type AccountKind,
   type BackupPayload,
+  type RecurringFrequency,
   type Transaction,
   type TransactionType,
   type TransferRule,
@@ -1590,7 +1591,7 @@ function SettingsView({
           </button>
           <button type="button" className="settings-action-button" onClick={() => setIsTransferRulesOpen(true)}>
             <ArrowRightLeft size={18} />
-            <span>自动划转</span>
+            <span>周期记账</span>
             <em>{transferRules.length} 条</em>
           </button>
           <button type="button" className="settings-action-button" onClick={() => setIsCategorySettingsOpen(true)}>
@@ -1604,7 +1605,7 @@ function SettingsView({
         <AccountSettingsPanel accounts={accounts} transactions={transactions} transferRules={transferRules} />
       </Popup>
       <Popup visible={isTransferRulesOpen} onMaskClick={() => setIsTransferRulesOpen(false)} bodyClassName="management-popup">
-        <TransferRulesPanel accounts={accounts} transferRules={transferRules} />
+        <RecurringRulesPanel accounts={accounts} categories={categories} transferRules={transferRules} />
       </Popup>
       <Popup visible={isCategorySettingsOpen} onMaskClick={() => setIsCategorySettingsOpen(false)} bodyClassName="management-popup">
         <CategorySettingsPanel categories={categories} transactions={transactions} />
@@ -1656,7 +1657,7 @@ function AccountSettingsPanel({
       <div className="asset-list">
         {accountRecords.map((account) => {
           const usageCount = transactions.filter((item) => transactionBelongsToAccount(item, account.name)).length;
-          const ruleCount = transferRules.filter((rule) => rule.fromAccount === account.name || rule.toAccount === account.name).length;
+          const ruleCount = transferRules.filter((rule) => (rule.account || rule.fromAccount) === account.name || rule.toAccount === account.name).length;
           const dependencyCount = usageCount + ruleCount;
           return (
             <article className="account-settings-row" key={account.name}>
@@ -1688,72 +1689,41 @@ function AccountSettingsPanel({
   );
 }
 
-function TransferRulesPanel({ accounts, transferRules }: { accounts: Account[]; transferRules: TransferRule[] }) {
-  const accountNames = accounts.length ? accounts.map((item) => item.name) : defaultAccounts;
-  const [ruleFromAccount, setRuleFromAccount] = useState(accountNames[0] ?? "");
-  const [ruleToAccount, setRuleToAccount] = useState(accountNames.find((item) => item !== (accountNames[0] ?? "")) ?? accountNames[0] ?? "");
-  const [ruleAmount, setRuleAmount] = useState("");
+const recurringFrequencyLabel: Record<RecurringFrequency, string> = {
+  daily: "每天",
+  weekday: "工作日",
+  weekend: "节假日",
+  weekly: "每周",
+  monthly: "每月",
+  yearly: "每年",
+};
 
-  useEffect(() => {
-    if (!accountNames.includes(ruleFromAccount)) {
-      setRuleFromAccount(accountNames[0] ?? "");
-    }
-    if (!ruleToAccount || !accountNames.includes(ruleToAccount) || ruleToAccount === ruleFromAccount) {
-      setRuleToAccount(accountNames.find((name) => name !== (ruleFromAccount || accountNames[0] || "")) ?? accountNames[0] ?? "");
-    }
-  }, [accountNames.join("|"), ruleFromAccount, ruleToAccount]);
-
-  async function addTransferRule(event: React.FormEvent) {
-    event.preventDefault();
-    const amount = Number(ruleAmount);
-    if (!amount || amount <= 0 || !ruleFromAccount || !ruleToAccount || ruleFromAccount === ruleToAccount) return;
-    await db.transferRules.add({
-      fromAccount: ruleFromAccount,
-      toAccount: ruleToAccount,
-      amount: Math.round(amount * 100) / 100,
-      frequency: "daily",
-      startDate: todayInputValue(),
-      enabled: true,
-      createdAt: new Date().toISOString(),
-    });
-    setRuleAmount("");
-    await applyAutoTransfers();
-  }
+function RecurringRulesPanel({
+  accounts,
+  categories,
+  transferRules,
+}: {
+  accounts: Account[];
+  categories: ReturnType<typeof useCategories>;
+  transferRules: TransferRule[];
+}) {
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
 
   return (
     <div className="management-panel">
-      <div className="popup-title">自动划转</div>
-      <form className="transfer-rule-form" onSubmit={addTransferRule}>
-        <select value={ruleFromAccount} onChange={(event) => setRuleFromAccount(event.target.value)}>
-          {accountNames.map((name) => (
-            <option value={name} key={name}>
-              从 {name}
-            </option>
-          ))}
-        </select>
-        <select value={ruleToAccount} onChange={(event) => setRuleToAccount(event.target.value)}>
-          {accountNames.map((name) => (
-            <option value={name} key={name}>
-              到 {name}
-            </option>
-          ))}
-        </select>
-        <input inputMode="decimal" placeholder="金额" value={ruleAmount} onChange={(event) => setRuleAmount(event.target.value)} />
-        <button type="submit">添加</button>
-      </form>
-      <div className="transfer-rule-list">
+      <div className="popup-title">周期记账</div>
+      <button type="button" className="secondary-button full-width-button" onClick={() => setIsEditorOpen(true)}>
+        新建周期记账
+      </button>
+      <div className="transfer-rule-list recurring-rule-list">
         {transferRules.length === 0 ? (
-          <div className="empty-state compact-empty">暂无自动划转</div>
+          <div className="empty-state compact-empty">暂无周期记账</div>
         ) : (
           transferRules.map((rule) => (
             <article className="transfer-rule-row" key={rule.id}>
               <div>
-                <strong>
-                  {rule.fromAccount} → {rule.toAccount}
-                </strong>
-                <span>
-                  每天 {currency.format(rule.amount)} · 已执行到 {rule.lastRunDate || rule.startDate}
-                </span>
+                <strong>{formatRecurringRuleTitle(rule)}</strong>
+                <span>{formatRecurringRuleSummary(rule)}</span>
               </div>
               <div className="asset-actions">
                 <button type="button" className="asset-delete" onClick={() => rule.id && db.transferRules.update(rule.id, { enabled: !rule.enabled })}>
@@ -1767,8 +1737,181 @@ function TransferRulesPanel({ accounts, transferRules }: { accounts: Account[]; 
           ))
         )}
       </div>
+      <Popup visible={isEditorOpen} onMaskClick={() => setIsEditorOpen(false)} bodyClassName="management-popup">
+        <RecurringRuleEditor accounts={accounts} categories={categories} onDone={() => setIsEditorOpen(false)} />
+      </Popup>
     </div>
   );
+}
+
+function RecurringRuleEditor({
+  accounts,
+  categories,
+  onDone,
+}: {
+  accounts: Account[];
+  categories: ReturnType<typeof useCategories>;
+  onDone: () => void;
+}) {
+  const accountNames = accounts.length ? accounts.map((item) => item.name) : defaultAccounts;
+  const [type, setType] = useState<TransactionType>("expense");
+  const typeCategories = categories.filter((category) => category.type === type);
+  const [category, setCategory] = useState(typeCategories[0]?.name ?? "");
+  const [account, setAccount] = useState(accountNames[0] ?? "");
+  const [toAccount, setToAccount] = useState(accountNames.find((item) => item !== (accountNames[0] ?? "")) ?? accountNames[0] ?? "");
+  const [amount, setAmount] = useState("");
+  const [frequency, setFrequency] = useState<RecurringFrequency>("daily");
+  const [daysText, setDaysText] = useState("");
+  const [startDate, setStartDate] = useState(todayInputValue());
+  const [endDate, setEndDate] = useState("");
+  const [note, setNote] = useState("");
+
+  useEffect(() => {
+    if (type === "transfer") return;
+    if (!typeCategories.some((item) => item.name === category)) {
+      setCategory(typeCategories[0]?.name ?? "");
+    }
+  }, [type, categories.length, category]);
+
+  useEffect(() => {
+    if (!accountNames.includes(account)) {
+      setAccount(accountNames[0] ?? "");
+    }
+    if (!toAccount || !accountNames.includes(toAccount) || toAccount === account) {
+      setToAccount(accountNames.find((name) => name !== (account || accountNames[0] || "")) ?? accountNames[0] ?? "");
+    }
+  }, [accountNames.join("|"), account, toAccount]);
+
+  async function addRecurringRule(event: React.FormEvent) {
+    event.preventDefault();
+    const value = Number(amount);
+    if (!value || value <= 0 || !account || !startDate) return;
+    if (type !== "transfer" && !category) return;
+    if (type === "transfer" && (!toAccount || account === toAccount)) return;
+    await db.transferRules.add({
+      type,
+      category: type === "transfer" ? "转账" : category,
+      account,
+      toAccount: type === "transfer" ? toAccount : undefined,
+      amount: Math.round(value * 100) / 100,
+      frequency,
+      days: parseRecurringDays(frequency, daysText),
+      startDate,
+      endDate: endDate || undefined,
+      note: note.trim() || "周期记账",
+      enabled: true,
+      createdAt: new Date().toISOString(),
+    });
+    setAmount("");
+    setNote("");
+    await applyAutoTransfers();
+    onDone();
+  }
+
+  return (
+    <div className="management-panel">
+      <div className="popup-title">新建周期记账</div>
+      <form className="recurring-rule-form" onSubmit={addRecurringRule}>
+        <div className="segmented compact-segmented">
+          <button type="button" className={type === "expense" ? "selected" : ""} onClick={() => setType("expense")}>
+            支出
+          </button>
+          <button type="button" className={type === "income" ? "selected" : ""} onClick={() => setType("income")}>
+            收入
+          </button>
+          <button type="button" className={type === "transfer" ? "selected" : ""} onClick={() => setType("transfer")}>
+            转账
+          </button>
+        </div>
+        <input inputMode="decimal" placeholder="金额" value={amount} onChange={(event) => setAmount(event.target.value)} />
+        {type !== "transfer" && (
+          <select value={category} onChange={(event) => setCategory(event.target.value)}>
+            {typeCategories.map((item) => (
+              <option value={item.name} key={`${item.type}-${item.name}`}>
+                {item.name}
+              </option>
+            ))}
+          </select>
+        )}
+        <select value={account} onChange={(event) => setAccount(event.target.value)}>
+          {accountNames.map((name) => (
+            <option value={name} key={name}>
+              {type === "transfer" ? `转出 ${name}` : name}
+            </option>
+          ))}
+        </select>
+        {type === "transfer" && (
+          <select value={toAccount} onChange={(event) => setToAccount(event.target.value)}>
+            {accountNames.map((name) => (
+              <option value={name} key={name}>
+                转入 {name}
+              </option>
+            ))}
+          </select>
+        )}
+        <select value={frequency} onChange={(event) => setFrequency(event.target.value as RecurringFrequency)}>
+          <option value="daily">每天</option>
+          <option value="weekday">工作日</option>
+          <option value="weekend">节假日</option>
+          <option value="weekly">每周</option>
+          <option value="monthly">每月</option>
+          <option value="yearly">每年</option>
+        </select>
+        {frequency === "weekly" && <input placeholder="周几，0=周日，1-6=周一到周六，可填多个如 1,3,5" value={daysText} onChange={(event) => setDaysText(event.target.value)} />}
+        {frequency === "monthly" && <input placeholder="每月几号，可填多个如 1,15,28" value={daysText} onChange={(event) => setDaysText(event.target.value)} />}
+        {frequency === "yearly" && <input placeholder="每年日期，格式 MMDD，可填多个如 0101,1001" value={daysText} onChange={(event) => setDaysText(event.target.value)} />}
+        <input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
+        <input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
+        <input placeholder="备注" value={note} onChange={(event) => setNote(event.target.value)} />
+        <button type="submit">保存</button>
+      </form>
+    </div>
+  );
+}
+
+function parseRecurringDays(frequency: RecurringFrequency, value: string) {
+  if (frequency === "daily" || frequency === "weekday" || frequency === "weekend") return undefined;
+  const values = value
+    .split(/[,\s，、]+/)
+    .map((item) => Number(item))
+    .filter((item) => Number.isInteger(item));
+  if (frequency === "weekly") return values.filter((item) => item >= 0 && item <= 6);
+  if (frequency === "monthly") return values.filter((item) => item >= 1 && item <= 31);
+  if (frequency === "yearly") return values.filter((item) => item >= 101 && item <= 1231);
+  return undefined;
+}
+
+function formatRecurringRuleTitle(rule: TransferRule) {
+  const type = rule.type || "transfer";
+  if (type === "transfer") return `${rule.account || rule.fromAccount || defaultAccounts[0]} → ${rule.toAccount || "未设置"}`;
+  return `${typeLabel[type]} · ${rule.category}`;
+}
+
+function formatRecurringRuleSummary(rule: TransferRule) {
+  const parts = [
+    recurringFrequencyLabel[rule.frequency || "daily"],
+    formatRecurringDays(rule),
+    currency.format(rule.amount),
+    `${rule.startDate} 起`,
+    rule.endDate ? `${rule.endDate} 止` : "",
+    rule.lastRunDate ? `已执行到 ${rule.lastRunDate}` : "",
+  ].filter(Boolean);
+  return parts.join(" · ");
+}
+
+function formatRecurringDays(rule: TransferRule) {
+  if (!rule.days?.length) return "";
+  if (rule.frequency === "weekly") return rule.days.map((day) => ["周日", "周一", "周二", "周三", "周四", "周五", "周六"][day] || `周${day}`).join("、");
+  if (rule.frequency === "monthly") return rule.days.map((day) => `${day}号`).join("、");
+  if (rule.frequency === "yearly") {
+    return rule.days
+      .map((day) => {
+        const text = String(day).padStart(4, "0");
+        return `${Number(text.slice(0, 2))}/${Number(text.slice(2, 4))}`;
+      })
+      .join("、");
+  }
+  return "";
 }
 
 function CategorySettingsPanel({ categories, transactions }: { categories: ReturnType<typeof useCategories>; transactions: Transaction[] }) {

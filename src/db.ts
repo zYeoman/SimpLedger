@@ -31,16 +31,24 @@ export type Account = {
   createdAt: string;
 };
 
+export type RecurringFrequency = "daily" | "weekday" | "weekend" | "weekly" | "monthly" | "yearly";
+
 export type TransferRule = {
   id?: number;
-  fromAccount: string;
-  toAccount: string;
+  type: TransactionType;
   amount: number;
-  frequency: "daily";
+  category: string;
+  account: string;
+  toAccount?: string;
+  frequency: RecurringFrequency;
+  days?: number[];
   startDate: string;
+  endDate?: string;
   lastRunDate?: string;
   enabled: boolean;
+  note?: string;
   createdAt: string;
+  fromAccount?: string;
 };
 
 export const accountKindLabel: Record<AccountKind, string> = {
@@ -102,6 +110,25 @@ class MoneyDb extends Dexie {
       accounts: "++id, &name, kind, createdAt",
       transferRules: "++id, createdAt, frequency, startDate, lastRunDate",
     });
+    this.version(7)
+      .stores({
+        transactions: "++id, type, category, account, toAccount, date, createdAt",
+        categories: "++id, &[name+type], type",
+        accounts: "++id, &name, kind, createdAt",
+        transferRules: "++id, createdAt, type, frequency, startDate, lastRunDate",
+      })
+      .upgrade((tx) =>
+        tx
+          .table("transferRules")
+          .toCollection()
+          .modify((rule: TransferRule) => {
+            if (!rule.type) rule.type = "transfer";
+            if (!rule.category) rule.category = "转账";
+            if (!rule.account) rule.account = rule.fromAccount || defaultAccounts[0];
+            if (!rule.frequency) rule.frequency = "daily";
+            if (!rule.note) rule.note = "周期记账";
+          })
+      );
   }
 }
 
@@ -161,6 +188,25 @@ function addDays(date: string, days: number) {
   return localDatePart(source);
 }
 
+function recurringRuleMatchesDate(rule: TransferRule, date: string) {
+  const source = new Date(`${date}T00:00:00`);
+  const weekday = source.getDay();
+  const dayOfMonth = source.getDate();
+  const month = source.getMonth() + 1;
+  const dayOfYear = Number(`${String(month).padStart(2, "0")}${String(dayOfMonth).padStart(2, "0")}`);
+  const start = new Date(`${rule.startDate}T00:00:00`);
+  const startDayOfYear = Number(`${String(start.getMonth() + 1).padStart(2, "0")}${String(start.getDate()).padStart(2, "0")}`);
+  const days = rule.days?.length ? rule.days : [];
+
+  if (rule.frequency === "daily") return true;
+  if (rule.frequency === "weekday") return weekday >= 1 && weekday <= 5;
+  if (rule.frequency === "weekend") return weekday === 0 || weekday === 6;
+  if (rule.frequency === "weekly") return (days.length ? days : [start.getDay()]).includes(weekday);
+  if (rule.frequency === "monthly") return (days.length ? days : [start.getDate()]).includes(dayOfMonth);
+  if (rule.frequency === "yearly") return (days.length ? days : [startDayOfYear]).includes(dayOfYear);
+  return false;
+}
+
 export async function applyAutoTransfers(today = localDatePart(new Date())) {
   const now = new Date().toISOString();
   await db.transaction("rw", db.transactions, db.transferRules, async () => {
@@ -168,15 +214,20 @@ export async function applyAutoTransfers(today = localDatePart(new Date())) {
     for (const rule of rules) {
       let date = rule.lastRunDate ? addDays(rule.lastRunDate, 1) : rule.startDate;
       let lastRunDate = rule.lastRunDate;
-      while (date <= today) {
-        if (rule.fromAccount !== rule.toAccount && rule.amount > 0) {
+      const lastDate = rule.endDate && rule.endDate < today ? rule.endDate : today;
+      while (date <= lastDate) {
+        const type = rule.type || "transfer";
+        const account = rule.account || rule.fromAccount || defaultAccounts[0];
+        const isValidTransfer = type !== "transfer" || (rule.toAccount && account !== rule.toAccount);
+        const hasCategory = type === "transfer" || Boolean(rule.category);
+        if (recurringRuleMatchesDate(rule, date) && rule.amount > 0 && isValidTransfer && hasCategory) {
           await db.transactions.add({
-            type: "transfer",
+            type,
             amount: Math.round(rule.amount * 100) / 100,
-            category: "转账",
-            account: rule.fromAccount,
-            toAccount: rule.toAccount,
-            note: "自动划转",
+            category: type === "transfer" ? "转账" : rule.category,
+            account,
+            toAccount: type === "transfer" ? rule.toAccount : undefined,
+            note: rule.note?.trim() || "周期记账",
             date,
             createdAt: now,
             updatedAt: now,
