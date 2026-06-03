@@ -843,6 +843,10 @@ h1 {
   gap: 10px;
 }
 
+.investment-stats-summary {
+  margin-top: -6px;
+}
+
 .stats-summary div {
   border: 1px solid #e6ded1;
   border-radius: 8px;
@@ -1270,12 +1274,14 @@ h1 {
 
 .asset-add-form {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   gap: 10px;
   margin-bottom: 14px;
 }
 
-.asset-add-form input {
+.asset-add-form input,
+.asset-add-form select,
+.asset-kind-select {
   min-width: 0;
   border: 1px solid #e6ded1;
   border-radius: 8px;
@@ -1296,7 +1302,7 @@ h1 {
 
 .asset-row {
   display: grid;
-  grid-template-columns: minmax(0, 0.75fr) minmax(0, 1.25fr) auto;
+  grid-template-columns: minmax(0, 0.72fr) minmax(0, 1.15fr) auto;
   gap: 12px;
   align-items: center;
   border: 1px solid #e6ded1;
@@ -1327,6 +1333,17 @@ h1 {
 
 .asset-row .negative {
   color: #c94f3f;
+}
+
+.asset-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.asset-kind-select {
+  min-height: 34px;
+  padding: 0 8px;
+  font-weight: 800;
 }
 
 .asset-delete {

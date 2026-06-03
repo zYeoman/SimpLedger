@@ -83,7 +83,21 @@ import {
   Zap,
 } from "lucide-react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
-import { db, defaultAccounts, exportBackup, importBackup, seedCategories, type Account, type BackupPayload, type Transaction, type TransactionType } from "./db";
+import {
+  accountKindLabel,
+  accountKindOf,
+  db,
+  defaultAccounts,
+  exportBackup,
+  importBackup,
+  inferAccountKind,
+  seedCategories,
+  type Account,
+  type AccountKind,
+  type BackupPayload,
+  type Transaction,
+  type TransactionType,
+} from "./db";
 import { currency, fileSafeStamp, getMonthRange, groupByDate, monthKey, sumByType, todayInputValue } from "./utils";
 import "./styles.css";
 
@@ -199,6 +213,7 @@ function App() {
           <StatsView
             items={statsItems}
             categories={categories}
+            accounts={accounts}
             mode={statsMode}
             month={statsMonth}
             year={statsYear}
@@ -1109,8 +1124,13 @@ function softColor(hex: string) {
 
 function AssetsView({ items, accounts }: { items: Transaction[]; accounts: Account[] }) {
   const [newAccount, setNewAccount] = useState("");
-  const accountNames = accounts.length ? accounts.map((item) => item.name) : defaultAccounts;
-  const rows = accountNames.map((account) => {
+  const [newAccountKind, setNewAccountKind] = useState<AccountKind>("cash");
+  const accountRecords: Account[] = accounts.length
+    ? accounts
+    : defaultAccounts.map((name) => ({ name, kind: inferAccountKind(name), createdAt: "" }));
+  const accountNames = accountRecords.map((item) => item.name);
+  const rows = accountRecords.map((accountRecord) => {
+    const account = accountRecord.name;
     const accountItems = items.filter((item) => (item.account || defaultAccounts[0]) === account);
     const income = sumByType(accountItems, "income");
     const expense = sumByType(accountItems, "expense");
@@ -1120,7 +1140,8 @@ function AssetsView({ items, accounts }: { items: Transaction[]; accounts: Accou
       expense,
       balance: income - expense,
       count: accountItems.length,
-      id: accounts.find((item) => item.name === account)?.id,
+      id: accountRecord.id,
+      kind: accountKindOf(accountRecord),
     };
   });
   const total = rows.reduce((sum, item) => sum + item.balance, 0);
@@ -1129,7 +1150,7 @@ function AssetsView({ items, accounts }: { items: Transaction[]; accounts: Accou
     event.preventDefault();
     const name = newAccount.trim();
     if (!name || accountNames.includes(name)) return;
-    await db.accounts.add({ name, createdAt: new Date().toISOString() });
+    await db.accounts.add({ name, kind: newAccountKind, createdAt: new Date().toISOString() });
     setNewAccount("");
   }
 
@@ -1153,6 +1174,10 @@ function AssetsView({ items, accounts }: { items: Transaction[]; accounts: Accou
         </div>
         <form className="asset-add-form" onSubmit={addAccount}>
           <input placeholder="新增资产账户" value={newAccount} onChange={(event) => setNewAccount(event.target.value)} />
+          <select value={newAccountKind} onChange={(event) => setNewAccountKind(event.target.value as AccountKind)}>
+            <option value="cash">{accountKindLabel.cash}</option>
+            <option value="investment">{accountKindLabel.investment}</option>
+          </select>
           <button type="submit">添加</button>
         </form>
         <div className="asset-list">
@@ -1160,7 +1185,9 @@ function AssetsView({ items, accounts }: { items: Transaction[]; accounts: Accou
             <article className="asset-row" key={row.account}>
               <div>
                 <strong>{row.account}</strong>
-                <span>{row.count} 笔记录</span>
+                <span>
+                  {accountKindLabel[row.kind]} · {row.count} 笔记录
+                </span>
               </div>
               <div>
                 <strong className={row.balance < 0 ? "negative" : ""}>{currency.format(row.balance)}</strong>
@@ -1168,9 +1195,20 @@ function AssetsView({ items, accounts }: { items: Transaction[]; accounts: Accou
                   收入 {currency.format(row.income)} · 支出 {currency.format(row.expense)}
                 </span>
               </div>
-              <button className="asset-delete" disabled={row.count > 0} onClick={() => deleteAccount(row.id, row.count)}>
-                删除
-              </button>
+              <div className="asset-actions">
+                <select
+                  className="asset-kind-select"
+                  value={row.kind}
+                  disabled={!row.id}
+                  onChange={(event) => row.id && db.accounts.update(row.id, { kind: event.target.value as AccountKind })}
+                >
+                  <option value="cash">{accountKindLabel.cash}</option>
+                  <option value="investment">{accountKindLabel.investment}</option>
+                </select>
+                <button className="asset-delete" disabled={row.count > 0} onClick={() => deleteAccount(row.id, row.count)}>
+                  删除
+                </button>
+              </div>
             </article>
           ))}
         </div>
@@ -1182,20 +1220,28 @@ function AssetsView({ items, accounts }: { items: Transaction[]; accounts: Accou
 function StatsView({
   items,
   categories,
+  accounts,
   mode,
   month,
   year,
 }: {
   items: Transaction[];
   categories: ReturnType<typeof useCategories>;
+  accounts: Account[];
   mode: "month" | "year";
   month: string;
   year: string;
 }) {
-  const expenseTotal = sumByType(items, "expense");
-  const incomeTotal = sumByType(items, "income");
-  const expenseData = buildCategoryStats(items, categories, "expense");
-  const incomeData = buildCategoryStats(items, categories, "income");
+  const accountKindByName = new Map(accounts.map((account) => [account.name, accountKindOf(account)]));
+  const ordinaryItems = items.filter((item) => (accountKindByName.get(item.account || defaultAccounts[0]) ?? inferAccountKind(item.account || defaultAccounts[0])) !== "investment");
+  const investmentItems = items.filter((item) => (accountKindByName.get(item.account || defaultAccounts[0]) ?? inferAccountKind(item.account || defaultAccounts[0])) === "investment");
+  const expenseTotal = sumByType(ordinaryItems, "expense");
+  const incomeTotal = sumByType(ordinaryItems, "income");
+  const investmentExpense = sumByType(investmentItems, "expense");
+  const investmentIncome = sumByType(investmentItems, "income");
+  const investmentProfit = investmentIncome - investmentExpense;
+  const expenseData = buildCategoryStats(ordinaryItems, categories, "expense");
+  const incomeData = buildCategoryStats(ordinaryItems, categories, "income");
 
   return (
     <section className="stats-page">
@@ -1213,6 +1259,22 @@ function StatsView({
           <strong className={incomeTotal - expenseTotal < 0 ? "expense" : ""}>{currency.format(incomeTotal - expenseTotal)}</strong>
         </div>
       </div>
+      {investmentItems.length > 0 && (
+        <div className="stats-summary investment-stats-summary">
+          <div>
+            <span>理财支出</span>
+            <strong className="expense">{currency.format(investmentExpense)}</strong>
+          </div>
+          <div>
+            <span>理财收入</span>
+            <strong>{currency.format(investmentIncome)}</strong>
+          </div>
+          <div>
+            <span>理财盈亏</span>
+            <strong className={investmentProfit < 0 ? "expense" : ""}>{currency.format(investmentProfit)}</strong>
+          </div>
+        </div>
+      )}
       <StatsCategorySection title="支出分类" total={expenseTotal} data={expenseData} />
       <StatsCategorySection title="收入分类" total={incomeTotal} data={incomeData} />
     </section>

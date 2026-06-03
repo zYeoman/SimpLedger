@@ -1,6 +1,7 @@
 import Dexie, { type Table } from "dexie";
 
 export type TransactionType = "expense" | "income";
+export type AccountKind = "cash" | "investment";
 
 export type Transaction = {
   id?: number;
@@ -25,8 +26,22 @@ export type Category = {
 export type Account = {
   id?: number;
   name: string;
+  kind?: AccountKind;
   createdAt: string;
 };
+
+export const accountKindLabel: Record<AccountKind, string> = {
+  cash: "现金",
+  investment: "理财",
+};
+
+export function inferAccountKind(name: string): AccountKind {
+  return /理财|投资|基金|股票|证券|余额宝|债券|定投/.test(name) ? "investment" : "cash";
+}
+
+export function accountKindOf(account: Pick<Account, "name" | "kind">): AccountKind {
+  return account.kind ?? inferAccountKind(account.name);
+}
 
 class MoneyDb extends Dexie {
   transactions!: Table<Transaction, number>;
@@ -53,6 +68,20 @@ class MoneyDb extends Dexie {
       categories: "++id, &[name+type], type",
       accounts: "++id, &name, createdAt",
     });
+    this.version(5)
+      .stores({
+        transactions: "++id, type, category, account, date, createdAt",
+        categories: "++id, &[name+type], type",
+        accounts: "++id, &name, kind, createdAt",
+      })
+      .upgrade((tx) =>
+        tx
+          .table("accounts")
+          .toCollection()
+          .modify((account: Account) => {
+            account.kind = accountKindOf(account);
+          })
+      );
   }
 }
 
@@ -92,7 +121,10 @@ export async function seedCategories() {
   const accountCount = await db.accounts.count();
   if (accountCount === 0) {
     const now = new Date().toISOString();
-    await db.accounts.bulkAdd(defaultAccounts.map((name) => ({ name, createdAt: now })));
+    await db.accounts.bulkAdd(defaultAccounts.map((name) => ({ name, kind: inferAccountKind(name), createdAt: now })));
+  } else {
+    const accounts = await db.accounts.toArray();
+    await Promise.all(accounts.map((account) => (account.kind ? Promise.resolve() : db.accounts.update(account.id!, { kind: inferAccountKind(account.name) }))));
   }
 }
 
@@ -127,10 +159,10 @@ export async function importBackup(payload: BackupPayload) {
     await db.accounts.clear();
     await db.categories.bulkAdd(payload.categories.map(({ id: _id, ...item }) => item));
     if (payload.accounts?.length) {
-      await db.accounts.bulkAdd(payload.accounts.map(({ id: _id, ...item }) => item));
+      await db.accounts.bulkAdd(payload.accounts.map(({ id: _id, ...item }) => ({ ...item, kind: item.kind ?? inferAccountKind(item.name) })));
     } else {
       const now = new Date().toISOString();
-      await db.accounts.bulkAdd(defaultAccounts.map((name) => ({ name, createdAt: now })));
+      await db.accounts.bulkAdd(defaultAccounts.map((name) => ({ name, kind: inferAccountKind(name), createdAt: now })));
     }
     await db.transactions.bulkAdd(payload.transactions.map(({ id: _id, ...item }) => item));
   });

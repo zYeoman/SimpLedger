@@ -94,6 +94,10 @@ def icon_from_img_name(img_name: str | None) -> str:
     return "wallet"
 
 
+def account_kind(name: str) -> str:
+    return "investment" if any(keyword in name for keyword in ["理财", "投资", "基金", "股票", "证券"]) else "cash"
+
+
 def fetch_rows(conn: sqlite3.Connection, sql: str) -> list[sqlite3.Row]:
     return list(conn.execute(sql))
 
@@ -135,6 +139,7 @@ def build_payload(db_path: Path) -> dict[str, Any]:
         accounts.append(
             {
                 "name": name,
+                "kind": account_kind(name),
                 "createdAt": iso_from_millis(asset["create_time"]),
             }
         )
@@ -162,7 +167,7 @@ def build_payload(db_path: Path) -> dict[str, Any]:
         account_name = (row["account_name"] or "默认资产").strip()
         if account_name and account_name not in seen_accounts:
             seen_accounts.add(account_name)
-            accounts.append({"name": account_name, "createdAt": iso_from_millis(row["create_time"])})
+            accounts.append({"name": account_name, "kind": account_kind(account_name), "createdAt": iso_from_millis(row["create_time"])})
         key = (category_name, tx_type)
         if key not in category_by_key:
             category_by_key[key] = {
