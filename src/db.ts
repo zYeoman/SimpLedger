@@ -1,6 +1,6 @@
 import Dexie, { type Table } from "dexie";
 
-export type TransactionType = "expense" | "income";
+export type TransactionType = "expense" | "income" | "transfer";
 export type AccountKind = "cash" | "investment";
 
 export type Transaction = {
@@ -9,6 +9,7 @@ export type Transaction = {
   amount: number;
   category: string;
   account?: string;
+  toAccount?: string;
   note: string;
   date: string;
   createdAt: string;
@@ -30,6 +31,18 @@ export type Account = {
   createdAt: string;
 };
 
+export type TransferRule = {
+  id?: number;
+  fromAccount: string;
+  toAccount: string;
+  amount: number;
+  frequency: "daily";
+  startDate: string;
+  lastRunDate?: string;
+  enabled: boolean;
+  createdAt: string;
+};
+
 export const accountKindLabel: Record<AccountKind, string> = {
   cash: "现金",
   investment: "理财",
@@ -47,6 +60,7 @@ class MoneyDb extends Dexie {
   transactions!: Table<Transaction, number>;
   categories!: Table<Category, number>;
   accounts!: Table<Account, number>;
+  transferRules!: Table<TransferRule, number>;
 
   constructor() {
     super("local-money-db");
@@ -82,6 +96,12 @@ class MoneyDb extends Dexie {
             account.kind = accountKindOf(account);
           })
       );
+    this.version(6).stores({
+      transactions: "++id, type, category, account, toAccount, date, createdAt",
+      categories: "++id, &[name+type], type",
+      accounts: "++id, &name, kind, createdAt",
+      transferRules: "++id, createdAt, frequency, startDate, lastRunDate",
+    });
   }
 }
 
@@ -128,6 +148,50 @@ export async function seedCategories() {
   }
 }
 
+function localDatePart(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function addDays(date: string, days: number) {
+  const source = new Date(`${date}T00:00:00`);
+  source.setDate(source.getDate() + days);
+  return localDatePart(source);
+}
+
+export async function applyAutoTransfers(today = localDatePart(new Date())) {
+  const now = new Date().toISOString();
+  await db.transaction("rw", db.transactions, db.transferRules, async () => {
+    const rules = (await db.transferRules.toArray()).filter((rule) => rule.enabled);
+    for (const rule of rules) {
+      let date = rule.lastRunDate ? addDays(rule.lastRunDate, 1) : rule.startDate;
+      let lastRunDate = rule.lastRunDate;
+      while (date <= today) {
+        if (rule.fromAccount !== rule.toAccount && rule.amount > 0) {
+          await db.transactions.add({
+            type: "transfer",
+            amount: Math.round(rule.amount * 100) / 100,
+            category: "转账",
+            account: rule.fromAccount,
+            toAccount: rule.toAccount,
+            note: "自动划转",
+            date,
+            createdAt: now,
+            updatedAt: now,
+          });
+        }
+        lastRunDate = date;
+        date = addDays(date, 1);
+      }
+      if (lastRunDate && lastRunDate !== rule.lastRunDate) {
+        await db.transferRules.update(rule.id!, { lastRunDate });
+      }
+    }
+  });
+}
+
 export type BackupPayload = {
   exportedAt: string;
   app: "local-money";
@@ -135,6 +199,7 @@ export type BackupPayload = {
   transactions: Transaction[];
   categories: Category[];
   accounts?: Account[];
+  transferRules?: TransferRule[];
 };
 
 export async function exportBackup(): Promise<BackupPayload> {
@@ -145,6 +210,7 @@ export async function exportBackup(): Promise<BackupPayload> {
     transactions: await db.transactions.orderBy("date").toArray(),
     categories: await db.categories.toArray(),
     accounts: await db.accounts.toArray(),
+    transferRules: await db.transferRules.toArray(),
   };
 }
 
@@ -153,10 +219,11 @@ export async function importBackup(payload: BackupPayload) {
     throw new Error("备份文件格式不正确");
   }
 
-  await db.transaction("rw", db.transactions, db.categories, db.accounts, async () => {
+  await db.transaction("rw", db.transactions, db.categories, db.accounts, db.transferRules, async () => {
     await db.transactions.clear();
     await db.categories.clear();
     await db.accounts.clear();
+    await db.transferRules.clear();
     await db.categories.bulkAdd(payload.categories.map(({ id: _id, ...item }) => item));
     if (payload.accounts?.length) {
       await db.accounts.bulkAdd(payload.accounts.map(({ id: _id, ...item }) => ({ ...item, kind: item.kind ?? inferAccountKind(item.name) })));
@@ -165,5 +232,8 @@ export async function importBackup(payload: BackupPayload) {
       await db.accounts.bulkAdd(defaultAccounts.map((name) => ({ name, kind: inferAccountKind(name), createdAt: now })));
     }
     await db.transactions.bulkAdd(payload.transactions.map(({ id: _id, ...item }) => item));
+    if (payload.transferRules?.length) {
+      await db.transferRules.bulkAdd(payload.transferRules.map(({ id: _id, ...item }) => item));
+    }
   });
 }

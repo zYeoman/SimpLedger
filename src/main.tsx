@@ -6,6 +6,7 @@ import "antd-mobile/bundle/style.css";
 import {
   ArrowDownCircle,
   ArrowUpCircle,
+  ArrowRightLeft,
   Apple,
   Baby,
   BarChart3,
@@ -86,6 +87,7 @@ import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import {
   accountKindLabel,
   accountKindOf,
+  applyAutoTransfers,
   db,
   defaultAccounts,
   exportBackup,
@@ -97,6 +99,7 @@ import {
   type BackupPayload,
   type Transaction,
   type TransactionType,
+  type TransferRule,
 } from "./db";
 import { currency, fileSafeStamp, getMonthRange, groupByDate, monthKey, sumByType, todayInputValue } from "./utils";
 import "./styles.css";
@@ -106,6 +109,7 @@ type View = "home" | "assets" | "stats" | "settings";
 const typeLabel: Record<TransactionType, string> = {
   expense: "支出",
   income: "收入",
+  transfer: "转账",
 };
 
 function App() {
@@ -123,14 +127,16 @@ function App() {
   const categoryRows = useLiveQuery(() => db.categories.orderBy("type").toArray(), []);
   const accountRows = useLiveQuery(() => db.accounts.orderBy("createdAt").toArray(), []);
   const transactionRows = useLiveQuery(() => db.transactions.orderBy("date").reverse().toArray(), []);
+  const transferRuleRows = useLiveQuery(() => db.transferRules.orderBy("createdAt").toArray(), []);
   const categories = categoryRows ?? [];
   const accounts = accountRows ?? [];
   const transactions = transactionRows ?? [];
-  const isDataReady = isSeedReady && categoryRows !== undefined && accountRows !== undefined && transactionRows !== undefined;
+  const transferRules = transferRuleRows ?? [];
+  const isDataReady = isSeedReady && categoryRows !== undefined && accountRows !== undefined && transactionRows !== undefined && transferRuleRows !== undefined;
 
   useEffect(() => {
     let isActive = true;
-    seedCategories().finally(() => {
+    seedCategories().then(() => applyAutoTransfers()).finally(() => {
       if (isActive) setIsSeedReady(true);
     });
     if ("serviceWorker" in navigator) {
@@ -162,11 +168,11 @@ function App() {
   }, [transactions]);
   const homeItems = useMemo(() => {
     if (homeAccountFilter === "all") return currentMonthItems;
-    return currentMonthItems.filter((item) => (item.account || defaultAccounts[0]) === homeAccountFilter);
+    return currentMonthItems.filter((item) => transactionBelongsToAccount(item, homeAccountFilter));
   }, [homeAccountFilter, currentMonthItems]);
   const homeDetailItems = useMemo(() => {
     if (homeAccountFilter === "all") return transactions;
-    return transactions.filter((item) => (item.account || defaultAccounts[0]) === homeAccountFilter);
+    return transactions.filter((item) => transactionBelongsToAccount(item, homeAccountFilter));
   }, [homeAccountFilter, transactions]);
   const statsItems = useMemo(() => {
     if (statsMode === "month") {
@@ -208,7 +214,7 @@ function App() {
             goEdit={openEntryPage}
           />
         )}
-        {isDataReady && view === "assets" && <AssetsView items={transactions} accounts={accounts} />}
+        {isDataReady && view === "assets" && <AssetsView items={transactions} accounts={accounts} transferRules={transferRules} />}
         {isDataReady && view === "stats" && (
           <StatsView
             items={statsItems}
@@ -289,6 +295,10 @@ function titleForView(view: View) {
     stats: "统计",
     settings: "设置",
   }[view];
+}
+
+function transactionBelongsToAccount(item: Transaction, account: string) {
+  return (item.account || defaultAccounts[0]) === account || (item.type === "transfer" && item.toAccount === account);
 }
 
 function HomeView({
@@ -451,8 +461,14 @@ function VirtualTransactionList({
               <strong>{currency.format(selectedItem.amount)}</strong>
               <span>分类</span>
               <strong>{selectedItem.category}</strong>
-              <span>账户</span>
+              <span>{selectedItem.type === "transfer" ? "转出账户" : "账户"}</span>
               <strong>{selectedItem.account || defaultAccounts[0]}</strong>
+              {selectedItem.type === "transfer" && (
+                <>
+                  <span>转入账户</span>
+                  <strong>{selectedItem.toAccount || "未设置"}</strong>
+                </>
+              )}
               <span>日期</span>
               <strong>{selectedItem.date}</strong>
               <span>备注</span>
@@ -508,11 +524,15 @@ function VirtualTransactionItem({
           <CategoryIcon icon={meta.icon} />
         </div>
         <div className="row-main">
-          <strong>{item.category}</strong>
-          <span>{[item.account, item.note].filter(Boolean).join(" · ") || typeLabel[item.type]}</span>
+          <strong>{item.type === "transfer" ? "转账" : item.category}</strong>
+          <span>
+            {item.type === "transfer"
+              ? [item.account && `${item.account} → ${item.toAccount || ""}`, item.note].filter(Boolean).join(" · ")
+              : [item.account, item.note].filter(Boolean).join(" · ") || typeLabel[item.type]}
+          </span>
         </div>
         <div className={`row-amount ${item.type}`}>
-          {item.type === "expense" ? "-" : "+"}
+          {item.type === "expense" ? "-" : item.type === "income" ? "+" : ""}
           {currency.format(item.amount).replace("¥", "")}
         </div>
       </div>
@@ -547,10 +567,12 @@ function EntryForm({
   const [amount, setAmount] = useState(transaction ? String(transaction.amount) : "");
   const [category, setCategory] = useState(transaction?.category ?? typeCategories[0]?.name ?? "");
   const [account, setAccount] = useState(transaction?.account ?? accountNames[0]);
+  const [toAccount, setToAccount] = useState(transaction?.toAccount ?? accountNames.find((item) => item !== (transaction?.account ?? accountNames[0])) ?? accountNames[0]);
   const [date, setDate] = useState(transaction?.date ?? todayInputValue());
   const [note, setNote] = useState(transaction?.note ?? "");
 
   useEffect(() => {
+    if (type === "transfer") return;
     if (!typeCategories.some((item) => item.name === category)) {
       setCategory(typeCategories[0]?.name ?? "");
     }
@@ -560,7 +582,16 @@ function EntryForm({
     if (!accountNames.includes(account)) {
       setAccount(accountNames[0]);
     }
+    if (!accountNames.includes(toAccount)) {
+      setToAccount(accountNames.find((item) => item !== accountNames[0]) ?? accountNames[0]);
+    }
   }, [accountNames.join("|")]);
+
+  useEffect(() => {
+    if (type === "transfer" && account === toAccount) {
+      setToAccount(accountNames.find((item) => item !== account) ?? account);
+    }
+  }, [type, account, toAccount, accountNames.join("|")]);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -569,13 +600,16 @@ function EntryForm({
       return;
     }
     const value = evaluateAmountExpression(amount);
-    if (!value || value <= 0 || !category) return;
+    if (!value || value <= 0) return;
+    if (type !== "transfer" && !category) return;
+    if (type === "transfer" && (!account || !toAccount || account === toAccount)) return;
     const now = new Date().toISOString();
     const payload = {
       type,
       amount: Math.round(value * 100) / 100,
-      category,
+      category: type === "transfer" ? "转账" : category,
       account,
+      toAccount: type === "transfer" ? toAccount : undefined,
       note: note.trim(),
       date,
       updatedAt: now,
@@ -650,24 +684,46 @@ function EntryForm({
         <button type="button" className={type === "income" ? "selected" : ""} onClick={() => setType("income")}>
           收入
         </button>
+        <button type="button" className={type === "transfer" ? "selected" : ""} onClick={() => setType("transfer")}>
+          转账
+        </button>
       </div>
 
-      <div className="category-grid">
-        {typeCategories.map((item) => (
-          <button
-            type="button"
-            key={`${item.type}-${item.name}`}
-            className={category === item.name ? "selected" : ""}
-            onClick={() => setCategory(item.name)}
-            style={{ "--swatch": item.color } as React.CSSProperties}
-          >
-            <span>
-              <CategoryIcon icon={item.icon} />
-            </span>
-            <em>{item.name}</em>
-          </button>
-        ))}
-      </div>
+      {type === "transfer" ? (
+        <div className="transfer-account-grid">
+          <Picker columns={accountColumns} value={[account]} onConfirm={(value) => setAccount(String(value[0]))}>
+            {(_, actions) => (
+              <Button className="transfer-account-button" color="primary" fill="solid" onClick={actions.open}>
+                转出 {account}
+              </Button>
+            )}
+          </Picker>
+          <Picker columns={accountColumns} value={[toAccount]} onConfirm={(value) => setToAccount(String(value[0]))}>
+            {(_, actions) => (
+              <Button className="transfer-account-button" color="primary" fill="solid" onClick={actions.open}>
+                转入 {toAccount}
+              </Button>
+            )}
+          </Picker>
+        </div>
+      ) : (
+        <div className="category-grid">
+          {typeCategories.map((item) => (
+            <button
+              type="button"
+              key={`${item.type}-${item.name}`}
+              className={category === item.name ? "selected" : ""}
+              onClick={() => setCategory(item.name)}
+              style={{ "--swatch": item.color } as React.CSSProperties}
+            >
+              <span>
+                <CategoryIcon icon={item.icon} />
+              </span>
+              <em>{item.name}</em>
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="entry-bottom">
         <div className="entry-meta-grid">
@@ -681,15 +737,17 @@ function EntryForm({
                 )}
               </DatePicker>
             </div>
-            <div className="choice-wrap">
-              <Picker columns={accountColumns} value={[account]} onConfirm={(value) => setAccount(String(value[0]))}>
-                {(_, actions) => (
-                  <Button className="choice-button" color="primary" fill="solid" onClick={actions.open}>
-                    {account}
-                  </Button>
-                )}
-              </Picker>
-            </div>
+            {type !== "transfer" && (
+              <div className="choice-wrap">
+                <Picker columns={accountColumns} value={[account]} onConfirm={(value) => setAccount(String(value[0]))}>
+                  {(_, actions) => (
+                    <Button className="choice-button" color="primary" fill="solid" onClick={actions.open}>
+                      {account}
+                    </Button>
+                  )}
+                </Picker>
+              </div>
+            )}
           </div>
           <label className="field note-field">
             <input placeholder="备注" value={note} onChange={(event) => setNote(event.target.value)} />
@@ -839,11 +897,15 @@ function TransactionList({
                       <CategoryIcon icon={meta.icon} />
                     </div>
                     <div className="row-main">
-                      <strong>{item.category}</strong>
-                      <span>{[item.account, item.note].filter(Boolean).join(" · ") || typeLabel[item.type]}</span>
+                      <strong>{item.type === "transfer" ? "转账" : item.category}</strong>
+                      <span>
+                        {item.type === "transfer"
+                          ? [item.account && `${item.account} → ${item.toAccount || ""}`, item.note].filter(Boolean).join(" · ")
+                          : [item.account, item.note].filter(Boolean).join(" · ") || typeLabel[item.type]}
+                      </span>
                     </div>
                     <div className={`row-amount ${item.type}`}>
-                      {item.type === "expense" ? "-" : "+"}
+                      {item.type === "expense" ? "-" : item.type === "income" ? "+" : ""}
                       {currency.format(item.amount).replace("¥", "")}
                     </div>
                   </div>
@@ -864,8 +926,14 @@ function TransactionList({
               <strong>{currency.format(selectedItem.amount)}</strong>
               <span>分类</span>
               <strong>{selectedItem.category}</strong>
-              <span>账户</span>
+              <span>{selectedItem.type === "transfer" ? "转出账户" : "账户"}</span>
               <strong>{selectedItem.account || defaultAccounts[0]}</strong>
+              {selectedItem.type === "transfer" && (
+                <>
+                  <span>转入账户</span>
+                  <strong>{selectedItem.toAccount || "未设置"}</strong>
+                </>
+              )}
               <span>日期</span>
               <strong>{selectedItem.date}</strong>
               <span>备注</span>
@@ -1085,6 +1153,7 @@ function CategoryIcon({ icon }: { icon?: string }) {
   if (icon === "repair") return <Wrench {...props} />;
   if (icon === "salary") return <BadgeDollarSign {...props} />;
   if (icon === "income") return <HandCoins {...props} />;
+  if (icon === "transfer") return <ArrowRightLeft {...props} />;
   if (icon === "cash") return <Banknote {...props} />;
   if (icon === "awards") return <Gift {...props} />;
   if (icon === "refund") return <ReceiptText {...props} />;
@@ -1104,6 +1173,9 @@ function CategoryIcon({ icon }: { icon?: string }) {
 }
 
 function getCategoryMeta(transaction: Transaction, categories: ReturnType<typeof useCategories>) {
+  if (transaction.type === "transfer") {
+    return { color: "#4776b4", icon: "transfer" };
+  }
   const matched = categories.find((category) => category.name === transaction.category && category.type === transaction.type);
   return {
     color: matched?.color || (transaction.type === "income" ? "#2f7d62" : "#6f7680"),
@@ -1122,29 +1194,45 @@ function softColor(hex: string) {
   )})`;
 }
 
-function AssetsView({ items, accounts }: { items: Transaction[]; accounts: Account[] }) {
+function AssetsView({ items, accounts, transferRules }: { items: Transaction[]; accounts: Account[]; transferRules: TransferRule[] }) {
   const [newAccount, setNewAccount] = useState("");
   const [newAccountKind, setNewAccountKind] = useState<AccountKind>("cash");
+  const [ruleFromAccount, setRuleFromAccount] = useState(defaultAccounts[0]);
+  const [ruleToAccount, setRuleToAccount] = useState("");
+  const [ruleAmount, setRuleAmount] = useState("");
   const accountRecords: Account[] = accounts.length
     ? accounts
     : defaultAccounts.map((name) => ({ name, kind: inferAccountKind(name), createdAt: "" }));
   const accountNames = accountRecords.map((item) => item.name);
   const rows = accountRecords.map((accountRecord) => {
     const account = accountRecord.name;
-    const accountItems = items.filter((item) => (item.account || defaultAccounts[0]) === account);
-    const income = sumByType(accountItems, "income");
-    const expense = sumByType(accountItems, "expense");
+    const accountItems = items.filter((item) => transactionBelongsToAccount(item, account));
+    const income = sumByType(accountItems.filter((item) => item.type !== "transfer"), "income");
+    const expense = sumByType(accountItems.filter((item) => item.type !== "transfer"), "expense");
+    const transferIn = accountItems.filter((item) => item.type === "transfer" && item.toAccount === account).reduce((sum, item) => sum + item.amount, 0);
+    const transferOut = accountItems.filter((item) => item.type === "transfer" && (item.account || defaultAccounts[0]) === account).reduce((sum, item) => sum + item.amount, 0);
     return {
       account,
       income,
       expense,
-      balance: income - expense,
+      transferIn,
+      transferOut,
+      balance: income + transferIn - expense - transferOut,
       count: accountItems.length,
       id: accountRecord.id,
       kind: accountKindOf(accountRecord),
     };
   });
   const total = rows.reduce((sum, item) => sum + item.balance, 0);
+
+  useEffect(() => {
+    if (!accountNames.includes(ruleFromAccount)) {
+      setRuleFromAccount(accountNames[0] ?? "");
+    }
+    if (!ruleToAccount || !accountNames.includes(ruleToAccount) || ruleToAccount === ruleFromAccount) {
+      setRuleToAccount(accountNames.find((name) => name !== (accountNames[0] ?? "")) ?? accountNames[0] ?? "");
+    }
+  }, [accountNames.join("|"), ruleFromAccount, ruleToAccount]);
 
   async function addAccount(event: React.FormEvent) {
     event.preventDefault();
@@ -1157,6 +1245,23 @@ function AssetsView({ items, accounts }: { items: Transaction[]; accounts: Accou
   async function deleteAccount(id: number | undefined, count: number) {
     if (!id || count > 0) return;
     await db.accounts.delete(id);
+  }
+
+  async function addTransferRule(event: React.FormEvent) {
+    event.preventDefault();
+    const amount = Number(ruleAmount);
+    if (!amount || amount <= 0 || !ruleFromAccount || !ruleToAccount || ruleFromAccount === ruleToAccount) return;
+    await db.transferRules.add({
+      fromAccount: ruleFromAccount,
+      toAccount: ruleToAccount,
+      amount: Math.round(amount * 100) / 100,
+      frequency: "daily",
+      startDate: todayInputValue(),
+      enabled: true,
+      createdAt: new Date().toISOString(),
+    });
+    setRuleAmount("");
+    await applyAutoTransfers();
   }
 
   return (
@@ -1192,7 +1297,7 @@ function AssetsView({ items, accounts }: { items: Transaction[]; accounts: Accou
               <div>
                 <strong className={row.balance < 0 ? "negative" : ""}>{currency.format(row.balance)}</strong>
                 <span>
-                  收入 {currency.format(row.income)} · 支出 {currency.format(row.expense)}
+                  收入 {currency.format(row.income)} · 支出 {currency.format(row.expense)} · 转入 {currency.format(row.transferIn)} · 转出 {currency.format(row.transferOut)}
                 </span>
               </div>
               <div className="asset-actions">
@@ -1211,6 +1316,60 @@ function AssetsView({ items, accounts }: { items: Transaction[]; accounts: Accou
               </div>
             </article>
           ))}
+        </div>
+      </div>
+      <div className="panel">
+        <div className="section-title">
+          <h2>自动划转</h2>
+          <span>每天执行</span>
+        </div>
+        <form className="transfer-rule-form" onSubmit={addTransferRule}>
+          <select value={ruleFromAccount} onChange={(event) => setRuleFromAccount(event.target.value)}>
+            {accountNames.map((name) => (
+              <option value={name} key={name}>
+                从 {name}
+              </option>
+            ))}
+          </select>
+          <select value={ruleToAccount} onChange={(event) => setRuleToAccount(event.target.value)}>
+            {accountNames.map((name) => (
+              <option value={name} key={name}>
+                到 {name}
+              </option>
+            ))}
+          </select>
+          <input inputMode="decimal" placeholder="金额" value={ruleAmount} onChange={(event) => setRuleAmount(event.target.value)} />
+          <button type="submit">添加</button>
+        </form>
+        <div className="transfer-rule-list">
+          {transferRules.length === 0 ? (
+            <div className="empty-state compact-empty">暂无自动划转</div>
+          ) : (
+            transferRules.map((rule) => (
+              <article className="transfer-rule-row" key={rule.id}>
+                <div>
+                  <strong>
+                    {rule.fromAccount} → {rule.toAccount}
+                  </strong>
+                  <span>
+                    每天 {currency.format(rule.amount)} · 已执行到 {rule.lastRunDate || rule.startDate}
+                  </span>
+                </div>
+                <div className="asset-actions">
+                  <button
+                    type="button"
+                    className="asset-delete"
+                    onClick={() => rule.id && db.transferRules.update(rule.id, { enabled: !rule.enabled })}
+                  >
+                    {rule.enabled ? "停用" : "启用"}
+                  </button>
+                  <button type="button" className="asset-delete" onClick={() => rule.id && db.transferRules.delete(rule.id)}>
+                    删除
+                  </button>
+                </div>
+              </article>
+            ))
+          )}
         </div>
       </div>
     </section>
@@ -1233,8 +1392,9 @@ function StatsView({
   year: string;
 }) {
   const accountKindByName = new Map(accounts.map((account) => [account.name, accountKindOf(account)]));
-  const ordinaryItems = items.filter((item) => (accountKindByName.get(item.account || defaultAccounts[0]) ?? inferAccountKind(item.account || defaultAccounts[0])) !== "investment");
-  const investmentItems = items.filter((item) => (accountKindByName.get(item.account || defaultAccounts[0]) ?? inferAccountKind(item.account || defaultAccounts[0])) === "investment");
+  const nonTransferItems = items.filter((item) => item.type !== "transfer");
+  const ordinaryItems = nonTransferItems.filter((item) => (accountKindByName.get(item.account || defaultAccounts[0]) ?? inferAccountKind(item.account || defaultAccounts[0])) !== "investment");
+  const investmentItems = nonTransferItems.filter((item) => (accountKindByName.get(item.account || defaultAccounts[0]) ?? inferAccountKind(item.account || defaultAccounts[0])) === "investment");
   const expenseTotal = sumByType(ordinaryItems, "expense");
   const incomeTotal = sumByType(ordinaryItems, "income");
   const investmentExpense = sumByType(investmentItems, "expense");

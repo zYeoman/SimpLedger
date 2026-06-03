@@ -193,6 +193,10 @@ h1 {
   color: #2f7d62;
 }
 
+.row-amount.transfer {
+  color: #4776b4;
+}
+
 .panel {
   padding: 16px;
 }
@@ -286,11 +290,29 @@ h1 {
 
 .segmented {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   border: 1px solid #ded7cc;
   border-radius: 8px;
   background: #fffaf2;
   padding: 4px;
+}
+
+.transfer-account-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  align-content: start;
+}
+
+.transfer-account-button {
+  width: 100%;
+  min-height: 54px;
+  font-size: 14px;
+  font-weight: 900;
+  --border-radius: 999px;
+  --border-color: #2f6f5e;
+  --text-color: #fff;
+  --background-color: #2f6f5e;
 }
 
 .segmented button,
@@ -1281,7 +1303,9 @@ h1 {
 
 .asset-add-form input,
 .asset-add-form select,
-.asset-kind-select {
+.asset-kind-select,
+.transfer-rule-form input,
+.transfer-rule-form select {
   min-width: 0;
   border: 1px solid #e6ded1;
   border-radius: 8px;
@@ -1291,6 +1315,7 @@ h1 {
 }
 
 .asset-add-form button,
+.transfer-rule-form button,
 .asset-delete {
   min-height: 42px;
   border-radius: 8px;
@@ -1298,6 +1323,49 @@ h1 {
   color: #fff;
   padding: 0 12px;
   font-weight: 800;
+}
+
+.transfer-rule-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) minmax(72px, 0.7fr) auto;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.transfer-rule-list {
+  display: grid;
+  gap: 10px;
+}
+
+.transfer-rule-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid #e6ded1;
+  border-radius: 8px;
+  background: #fff;
+  padding: 12px;
+}
+
+.transfer-rule-row strong,
+.transfer-rule-row span {
+  display: block;
+}
+
+.transfer-rule-row strong {
+  color: #27322f;
+  font-size: 15px;
+}
+
+.transfer-rule-row span {
+  margin-top: 4px;
+  color: #77807b;
+  font-size: 12px;
+}
+
+.compact-empty {
+  min-height: 72px;
 }
 
 .asset-row {
