@@ -17,6 +17,7 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "recharts": "^2.15.0",
+    "tyme4ts": "^1.5.1",
     "typescript": "^5.8.0",
     "vite": "^7.0.0"
   },

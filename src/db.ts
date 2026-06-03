@@ -188,7 +188,16 @@ function addDays(date: string, days: number) {
   return localDatePart(source);
 }
 
-function recurringRuleMatchesDate(rule: TransferRule, date: string) {
+async function isWorkdayByLegalCalendar(date: string) {
+  const { LegalHoliday } = await import("tyme4ts");
+  const source = new Date(`${date}T00:00:00`);
+  const legalHoliday = LegalHoliday.fromYmd(source.getFullYear(), source.getMonth() + 1, source.getDate());
+  if (legalHoliday) return legalHoliday.isWork();
+  const weekday = source.getDay();
+  return weekday >= 1 && weekday <= 5;
+}
+
+async function recurringRuleMatchesDate(rule: TransferRule, date: string) {
   const source = new Date(`${date}T00:00:00`);
   const weekday = source.getDay();
   const dayOfMonth = source.getDate();
@@ -199,8 +208,8 @@ function recurringRuleMatchesDate(rule: TransferRule, date: string) {
   const days = rule.days?.length ? rule.days : [];
 
   if (rule.frequency === "daily") return true;
-  if (rule.frequency === "weekday") return weekday >= 1 && weekday <= 5;
-  if (rule.frequency === "weekend") return weekday === 0 || weekday === 6;
+  if (rule.frequency === "weekday") return isWorkdayByLegalCalendar(date);
+  if (rule.frequency === "weekend") return !(await isWorkdayByLegalCalendar(date));
   if (rule.frequency === "weekly") return (days.length ? days : [start.getDay()]).includes(weekday);
   if (rule.frequency === "monthly") return (days.length ? days : [start.getDate()]).includes(dayOfMonth);
   if (rule.frequency === "yearly") return (days.length ? days : [startDayOfYear]).includes(dayOfYear);
@@ -220,7 +229,7 @@ export async function applyAutoTransfers(today = localDatePart(new Date())) {
         const account = rule.account || rule.fromAccount || defaultAccounts[0];
         const isValidTransfer = type !== "transfer" || (rule.toAccount && account !== rule.toAccount);
         const hasCategory = type === "transfer" || Boolean(rule.category);
-        if (recurringRuleMatchesDate(rule, date) && rule.amount > 0 && isValidTransfer && hasCategory) {
+        if ((await recurringRuleMatchesDate(rule, date)) && rule.amount > 0 && isValidTransfer && hasCategory) {
           await db.transactions.add({
             type,
             amount: Math.round(rule.amount * 100) / 100,

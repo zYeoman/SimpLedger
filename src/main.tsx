@@ -1824,7 +1824,7 @@ function AccountSettingsPanel({
 const recurringFrequencyLabel: Record<RecurringFrequency, string> = {
   daily: "每天",
   weekday: "工作日",
-  weekend: "节假日",
+  weekend: "休息日",
   weekly: "每周",
   monthly: "每月",
   yearly: "每年",
