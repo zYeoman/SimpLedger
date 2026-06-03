@@ -115,6 +115,7 @@ const typeLabel: Record<TransactionType, string> = {
 
 function App() {
   const [view, setView] = useState<View>("home");
+  const viewRef = useRef<View>("home");
   const [isEntryOpen, setIsEntryOpen] = useState(false);
   const [isEntryClosing, setIsEntryClosing] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
@@ -153,9 +154,25 @@ function App() {
   }, [isEntryOpen]);
 
   useEffect(() => {
-    function handlePopState() {
+    viewRef.current = view;
+  }, [view]);
+
+  useEffect(() => {
+    function handlePopState(event: PopStateEvent) {
       if (isEntryOpenRef.current) {
         animateEntryClose();
+        return;
+      }
+      const state = event.state && typeof event.state === "object" ? event.state : {};
+      const stateView = state.localMoneyView as View | undefined;
+      if (stateView) {
+        viewRef.current = stateView;
+        setView(stateView);
+        return;
+      }
+      if (viewRef.current !== "home") {
+        viewRef.current = "home";
+        setView("home");
       }
     }
 
@@ -248,7 +265,7 @@ function App() {
       )}
 
       <nav className="bottom-nav">
-        <TabBar className="main-tabbar" activeKey={view} onChange={(key) => setView(key as View)}>
+        <TabBar className="main-tabbar" activeKey={view} onChange={(key) => navigateView(key as View)}>
           <TabBar.Item key="home" icon={<Home size={20} />} title="首页" />
           <TabBar.Item key="assets" icon={<Wallet size={20} />} title="资产" />
           <TabBar.Item key="stats" icon={<BarChart3 size={20} />} title="统计" />
@@ -269,6 +286,28 @@ function App() {
     setIsEntryClosing(false);
     setIsEntryOpen(true);
     isEntryOpenRef.current = true;
+  }
+
+  function navigateView(nextView: View) {
+    if (nextView === viewRef.current) return;
+    if (nextView === "home") {
+      const state = window.history.state && typeof window.history.state === "object" ? { ...window.history.state } : {};
+      delete state.localMoneyView;
+      window.history.replaceState(state, "", window.location.href);
+      viewRef.current = "home";
+      setView("home");
+      return;
+    }
+
+    const state = window.history.state && typeof window.history.state === "object" ? { ...window.history.state } : {};
+    state.localMoneyView = nextView;
+    if (viewRef.current === "home") {
+      window.history.pushState(state, "", window.location.href);
+    } else {
+      window.history.replaceState(state, "", window.location.href);
+    }
+    viewRef.current = nextView;
+    setView(nextView);
   }
 
   function closeEntryPage() {
