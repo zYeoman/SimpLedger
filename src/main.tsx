@@ -1243,14 +1243,16 @@ function AssetsView({ items, accounts }: { items: Transaction[]; accounts: Accou
         </div>
         <div className="asset-list">
           {rows.map((row) => {
-            const flowItems = [
-              ["收入", formatAmountPlain(row.income)],
-              ["支出", formatAmountPlain(row.expense)],
-              ["转入", formatAmountPlain(row.transferIn)],
-              ["转出", formatAmountPlain(row.transferOut)],
+            const flowGroups = [
+              [
+                ["收入", formatAmountPlain(row.income)],
+                ["支出", formatAmountPlain(row.expense)],
+              ],
+              [
+                ["转入", formatAmountPlain(row.transferIn)],
+                ["转出", formatAmountPlain(row.transferOut)],
+              ],
             ];
-            const maxFlowLength = Math.max(...flowItems.map(([, value]) => value.length));
-            const flowBasis = maxFlowLength >= 12 ? "100%" : maxFlowLength >= 9 ? "42%" : "118px";
             return (
               <article
                 className="asset-row"
@@ -1267,12 +1269,16 @@ function AssetsView({ items, accounts }: { items: Transaction[]; accounts: Accou
                 <div className="asset-row-balance">
                   <strong className={row.balance < 0 ? "negative" : ""}>{currency.format(row.balance)}</strong>
                 </div>
-                <div className="asset-flow-line" style={{ "--flow-basis": flowBasis } as React.CSSProperties}>
-                  {flowItems.map(([label, value]) => (
-                    <span key={label}>
-                      <em>{label}</em>
-                      <strong>{value}</strong>
-                    </span>
+                <div className="asset-flow-line">
+                  {flowGroups.map((group, index) => (
+                    <div className="asset-flow-group" key={index}>
+                      {group.map(([label, value]) => (
+                        <span key={label}>
+                          <em>{label}</em>
+                          <strong>{value}</strong>
+                        </span>
+                      ))}
+                    </div>
                   ))}
                 </div>
                 <div className="asset-progress" aria-hidden="true">

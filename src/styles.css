@@ -1523,19 +1523,22 @@ h1 {
 
 .asset-flow-line {
   grid-column: 1 / -1;
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
   gap: 6px;
 }
 
-.asset-flow-line span {
+.asset-flow-group {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.asset-flow-group span {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  flex: 1 1 var(--flow-basis, 118px);
   gap: 10px;
   min-width: 0;
-  max-width: 100%;
   border-radius: 6px;
   background: #f7f3ec;
   color: #5f6965;
@@ -1544,12 +1547,12 @@ h1 {
   font-weight: 800;
 }
 
-.asset-flow-line em {
+.asset-flow-group em {
   color: #77807b;
   font-style: normal;
 }
 
-.asset-flow-line strong {
+.asset-flow-group strong {
   min-width: 0;
   overflow: hidden;
   color: #27322f;
@@ -1693,6 +1696,10 @@ h1 {
 
   .summary-band strong {
     font-size: 26px;
+  }
+
+  .asset-flow-group {
+    grid-template-columns: 1fr;
   }
 
   .row-amount {
