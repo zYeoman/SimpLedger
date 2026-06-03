@@ -1220,6 +1220,9 @@ function AssetsView({ items, accounts }: { items: Transaction[]; accounts: Accou
     };
   });
   const total = rows.reduce((sum, item) => sum + item.balance, 0);
+  const cashTotal = rows.filter((item) => item.kind === "cash").reduce((sum, item) => sum + item.balance, 0);
+  const investmentTotal = rows.filter((item) => item.kind === "investment").reduce((sum, item) => sum + item.balance, 0);
+  const totalAbsBalance = rows.reduce((sum, item) => sum + Math.abs(item.balance), 0);
 
   return (
     <section className="settings-stack">
@@ -1227,6 +1230,10 @@ function AssetsView({ items, accounts }: { items: Transaction[]; accounts: Accou
         <div>
           <span>总资产</span>
           <strong>{currency.format(total)}</strong>
+        </div>
+        <div className="asset-summary-breakdown">
+          <span>现金 {currency.format(cashTotal)}</span>
+          <span>理财 {currency.format(investmentTotal)}</span>
         </div>
       </div>
       <div className="panel">
@@ -1236,18 +1243,30 @@ function AssetsView({ items, accounts }: { items: Transaction[]; accounts: Accou
         </div>
         <div className="asset-list">
           {rows.map((row) => (
-            <article className="asset-row" key={row.account}>
-              <div>
+            <article
+              className="asset-row"
+              key={row.account}
+              style={{ "--swatch": row.kind === "investment" ? "#4776b4" : "#2f6f5e" } as React.CSSProperties}
+            >
+              <div className="asset-row-icon">{row.kind === "investment" ? <TrendingUp /> : <Wallet />}</div>
+              <div className="asset-row-main">
                 <strong>{row.account}</strong>
-                <span>{row.count} 笔记录</span>
-              </div>
-              <div>
-                <strong className={row.balance < 0 ? "negative" : ""}>{currency.format(row.balance)}</strong>
                 <span>
-                  收入 {currency.format(row.income)} · 支出 {currency.format(row.expense)} · 转入 {currency.format(row.transferIn)} · 转出 {currency.format(row.transferOut)}
+                  {accountKindLabel[row.kind]} · {row.count} 笔记录
                 </span>
               </div>
-              <span className="asset-kind-badge">{accountKindLabel[row.kind]}</span>
+              <div className="asset-row-balance">
+                <strong className={row.balance < 0 ? "negative" : ""}>{currency.format(row.balance)}</strong>
+              </div>
+              <div className="asset-flow-line">
+                <span>收入 {formatAmountPlain(row.income)}</span>
+                <span>支出 {formatAmountPlain(row.expense)}</span>
+                <span>转入 {formatAmountPlain(row.transferIn)}</span>
+                <span>转出 {formatAmountPlain(row.transferOut)}</span>
+              </div>
+              <div className="asset-progress" aria-hidden="true">
+                <i style={{ width: `${totalAbsBalance ? Math.max((Math.abs(row.balance) / totalAbsBalance) * 100, 4) : 0}%` }} />
+              </div>
             </article>
           ))}
         </div>

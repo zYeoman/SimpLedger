@@ -1336,12 +1336,30 @@ h1 {
 }
 
 .asset-summary {
+  display: grid;
+  gap: 12px;
   background: #334a62;
+}
+
+.asset-summary-breakdown {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.asset-summary-breakdown span {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.9);
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .asset-list {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .asset-add-form {
@@ -1447,13 +1465,13 @@ h1 {
 
 .asset-row {
   display: grid;
-  grid-template-columns: minmax(0, 0.72fr) minmax(0, 1.15fr) auto;
-  gap: 12px;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  gap: 10px 12px;
   align-items: center;
   border: 1px solid #e6ded1;
   border-radius: 8px;
   background: #fff;
-  padding: 14px;
+  padding: 12px;
 }
 
 .asset-row strong,
@@ -1461,9 +1479,28 @@ h1 {
   display: block;
 }
 
+.asset-row-icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
+  background: #eef3ee;
+  color: var(--swatch);
+}
+
+.asset-row-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.asset-row-main {
+  min-width: 0;
+}
+
 .asset-row strong {
   color: #27322f;
-  font-size: 18px;
+  font-size: 16px;
 }
 
 .asset-row span {
@@ -1472,22 +1509,50 @@ h1 {
   font-size: 12px;
 }
 
-.asset-row > div:nth-child(2) {
+.asset-row-balance {
   text-align: right;
+}
+
+.asset-row-balance strong {
+  font-size: 17px;
 }
 
 .asset-row .negative {
   color: #c94f3f;
 }
 
-.asset-kind-badge {
-  justify-self: end;
-  border-radius: 999px;
-  background: #e8f0e8;
-  color: #2f6f5e !important;
-  padding: 6px 10px;
+.asset-flow-line {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.asset-flow-line span {
+  min-width: 0;
+  border-radius: 6px;
+  background: #f7f3ec;
+  color: #5f6965;
+  padding: 6px 4px;
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 800;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.asset-progress {
+  grid-column: 1 / -1;
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #eee7dc;
+}
+
+.asset-progress i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--swatch);
 }
 
 .asset-actions {
@@ -1609,6 +1674,10 @@ h1 {
 
   .summary-band strong {
     font-size: 26px;
+  }
+
+  .asset-flow-line {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .row-amount {
