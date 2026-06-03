@@ -1427,6 +1427,7 @@ h1 {
 }
 
 .recurring-field input {
+  min-height: 38px;
   border: 0;
   background: transparent;
   padding: 0;
@@ -1470,13 +1471,16 @@ h1 {
 }
 
 .compact-segmented button {
+  border: 0;
   background: transparent;
   color: #4b5652;
 }
 
 .compact-segmented .selected {
+  border: 0;
   background: #2f6f5e;
   color: #fff;
+  box-shadow: none;
 }
 
 .recurring-rule-list {
