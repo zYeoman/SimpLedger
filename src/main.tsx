@@ -1852,16 +1852,16 @@ function RecurringRuleEditor({
               </Button>
             )}
           </Picker>
+          {type === "transfer" && (
+            <Picker columns={accountColumns} value={[toAccount]} onConfirm={(value) => setToAccount(String(value[0]))}>
+              {(_, actions) => (
+                <Button className="recurring-choice-button" color="primary" fill="solid" onClick={actions.open}>
+                  转入 {toAccount || "选择账户"}
+                </Button>
+              )}
+            </Picker>
+          )}
         </div>
-        {type === "transfer" && (
-          <Picker columns={accountColumns} value={[toAccount]} onConfirm={(value) => setToAccount(String(value[0]))}>
-            {(_, actions) => (
-              <Button className="recurring-choice-button" color="primary" fill="solid" onClick={actions.open}>
-                转入 {toAccount || "选择账户"}
-              </Button>
-            )}
-          </Picker>
-        )}
         <div className="recurring-field">
           <span>重复</span>
           <Picker columns={frequencyColumns} value={[frequency]} onConfirm={(value) => setFrequency(value[0] as RecurringFrequency)}>

@@ -1469,6 +1469,16 @@ h1 {
   margin-bottom: 2px;
 }
 
+.compact-segmented button {
+  background: transparent;
+  color: #4b5652;
+}
+
+.compact-segmented .selected {
+  background: #2f6f5e;
+  color: #fff;
+}
+
 .recurring-rule-list {
   margin-top: 12px;
 }
