@@ -1242,45 +1242,45 @@ function AssetsView({ items, accounts }: { items: Transaction[]; accounts: Accou
           <span>按已记录收支计算</span>
         </div>
         <div className="asset-list">
-          {rows.map((row) => (
-            <article
-              className="asset-row"
-              key={row.account}
-              style={{ "--swatch": row.kind === "investment" ? "#4776b4" : "#2f6f5e" } as React.CSSProperties}
-            >
-              <div className="asset-row-icon">{row.kind === "investment" ? <TrendingUp /> : <Wallet />}</div>
-              <div className="asset-row-main">
-                <strong>{row.account}</strong>
-                <span>
-                  {accountKindLabel[row.kind]} · {row.count} 笔记录
-                </span>
-              </div>
-              <div className="asset-row-balance">
-                <strong className={row.balance < 0 ? "negative" : ""}>{currency.format(row.balance)}</strong>
-              </div>
-              <div className="asset-flow-line">
-                <span>
-                  <em>收入</em>
-                  <strong>{formatAmountPlain(row.income)}</strong>
-                </span>
-                <span>
-                  <em>支出</em>
-                  <strong>{formatAmountPlain(row.expense)}</strong>
-                </span>
-                <span>
-                  <em>转入</em>
-                  <strong>{formatAmountPlain(row.transferIn)}</strong>
-                </span>
-                <span>
-                  <em>转出</em>
-                  <strong>{formatAmountPlain(row.transferOut)}</strong>
-                </span>
-              </div>
-              <div className="asset-progress" aria-hidden="true">
-                <i style={{ width: `${totalAbsBalance ? Math.max((Math.abs(row.balance) / totalAbsBalance) * 100, 4) : 0}%` }} />
-              </div>
-            </article>
-          ))}
+          {rows.map((row) => {
+            const flowItems = [
+              ["收入", formatAmountPlain(row.income)],
+              ["支出", formatAmountPlain(row.expense)],
+              ["转入", formatAmountPlain(row.transferIn)],
+              ["转出", formatAmountPlain(row.transferOut)],
+            ];
+            const maxFlowLength = Math.max(...flowItems.map(([, value]) => value.length));
+            const flowBasis = maxFlowLength >= 12 ? "100%" : maxFlowLength >= 9 ? "42%" : "118px";
+            return (
+              <article
+                className="asset-row"
+                key={row.account}
+                style={{ "--swatch": row.kind === "investment" ? "#4776b4" : "#2f6f5e" } as React.CSSProperties}
+              >
+                <div className="asset-row-icon">{row.kind === "investment" ? <TrendingUp /> : <Wallet />}</div>
+                <div className="asset-row-main">
+                  <strong>{row.account}</strong>
+                  <span>
+                    {accountKindLabel[row.kind]} · {row.count} 笔记录
+                  </span>
+                </div>
+                <div className="asset-row-balance">
+                  <strong className={row.balance < 0 ? "negative" : ""}>{currency.format(row.balance)}</strong>
+                </div>
+                <div className="asset-flow-line" style={{ "--flow-basis": flowBasis } as React.CSSProperties}>
+                  {flowItems.map(([label, value]) => (
+                    <span key={label}>
+                      <em>{label}</em>
+                      <strong>{value}</strong>
+                    </span>
+                  ))}
+                </div>
+                <div className="asset-progress" aria-hidden="true">
+                  <i style={{ width: `${totalAbsBalance ? Math.max((Math.abs(row.balance) / totalAbsBalance) * 100, 4) : 0}%` }} />
+                </div>
+              </article>
+            );
+          })}
         </div>
       </div>
     </section>

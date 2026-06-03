@@ -1523,7 +1523,8 @@ h1 {
 
 .asset-flow-line {
   grid-column: 1 / -1;
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
   gap: 6px;
 }
 
@@ -1531,8 +1532,10 @@ h1 {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
+  flex: 1 1 var(--flow-basis, 118px);
   gap: 10px;
   min-width: 0;
+  max-width: 100%;
   border-radius: 6px;
   background: #f7f3ec;
   color: #5f6965;
