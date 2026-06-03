@@ -1877,7 +1877,7 @@ function ColorPicker({ value, onChange }: { value: string; onChange: (value: str
         type="button"
         className="color-picker-trigger"
         aria-label="选择颜色"
-        style={{ "--swatch": value } as React.CSSProperties}
+        style={{ backgroundColor: value }}
         onClick={() => setVisible(true)}
       />
       <Popup visible={visible} onMaskClick={() => setVisible(false)} bodyClassName="color-picker-popup">
