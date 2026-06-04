@@ -879,6 +879,10 @@ function EntryForm({
 
   function preventKeyboardSubmit(event: React.KeyboardEvent<HTMLFormElement>) {
     if (event.key === "Enter") {
+      const target = event.target;
+      if (target instanceof HTMLInputElement && target.name === "note" && evaluateAmountExpression(amount) > 0) {
+        return;
+      }
       event.preventDefault();
     }
   }
@@ -971,7 +975,7 @@ function EntryForm({
             )}
           </div>
           <label className="field note-field">
-            <input placeholder="备注" value={note} onChange={(event) => setNote(event.target.value)} />
+            <input name="note" placeholder="备注" value={note} onChange={(event) => setNote(event.target.value)} />
           </label>
         </div>
         <label className="field amount-field">
