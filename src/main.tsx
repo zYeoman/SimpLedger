@@ -225,6 +225,11 @@ function App() {
     return transactions.filter((item) => item.date.startsWith(`${statsYear}-`));
   }, [statsMode, statsMonth, statsYear, transactions]);
 
+  useEffect(() => {
+    swiperRef.current?.update();
+    swiperRef.current?.updateAutoHeight(0);
+  }, [view, isDataReady, homeItems.length, homeDetailItems.length, statsItems.length, accounts.length, categories.length, transferRules.length]);
+
   return (
     <main className="app-shell">
       <header className={`topbar ${view === "stats" ? "stats-topbar" : ""}`}>
