@@ -357,11 +357,16 @@ h1 {
   padding: 4px;
 }
 
-.transfer-account-grid {
+.transfer-account-grid,
+.transfer-account-selectors {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
   align-content: start;
+}
+
+.transfer-account-selectors {
+  grid-template-columns: 1fr;
 }
 
 .transfer-account-button {
@@ -373,6 +378,46 @@ h1 {
   --border-color: #2f6f5e;
   --text-color: #fff;
   --background-color: #2f6f5e;
+}
+
+.account-choice-panel {
+  display: grid;
+  gap: 8px;
+  border: 1px solid #e6ded1;
+  border-radius: 8px;
+  background: #fffaf2;
+  padding: 10px;
+}
+
+.account-choice-panel > span {
+  color: #77807b;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.account-button-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.account-button-grid button {
+  min-height: 36px;
+  border-radius: 8px;
+  background: #efe7dc;
+  color: #4b5652;
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.account-button-grid button.selected {
+  background: #2f6f5e;
+  color: #fff;
+}
+
+.entry-account-buttons {
+  margin-top: -2px;
 }
 
 .segmented button,

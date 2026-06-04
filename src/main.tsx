@@ -159,11 +159,12 @@ function App() {
 
   useEffect(() => {
     function handlePopState(event: PopStateEvent) {
+      const state = event.state && typeof event.state === "object" ? event.state : {};
       if (isEntryOpenRef.current) {
+        if (state.localMoneyEntry) return;
         animateEntryClose();
         return;
       }
-      const state = event.state && typeof event.state === "object" ? event.state : {};
       const stateView = state.localMoneyView as View | undefined;
       if (stateView) {
         viewRef.current = stateView;
@@ -793,7 +794,6 @@ function EntryForm({
 
   const dateLabel = formatEntryDateLabel(date);
   const dateValue = new Date(`${date}T00:00:00`);
-  const accountColumns = [accountNames.map((item) => ({ label: item, value: item }))];
   const hasAmountExpression = /[+-]/.test(amount);
 
   function calculateAmountInPlace() {
@@ -818,21 +818,27 @@ function EntryForm({
       </div>
 
       {type === "transfer" ? (
-        <div className="transfer-account-grid">
-          <BackedPicker historyKey="localMoneyEntryTransferFromPicker" columns={accountColumns} value={[account]} onConfirm={(value) => setAccount(String(value[0]))}>
-            {(_, actions) => (
-              <Button className="transfer-account-button" color="primary" fill="solid" onClick={actions.open}>
-                转出 {account}
-              </Button>
-            )}
-          </BackedPicker>
-          <BackedPicker historyKey="localMoneyEntryTransferToPicker" columns={accountColumns} value={[toAccount]} onConfirm={(value) => setToAccount(String(value[0]))}>
-            {(_, actions) => (
-              <Button className="transfer-account-button" color="primary" fill="solid" onClick={actions.open}>
-                转入 {toAccount}
-              </Button>
-            )}
-          </BackedPicker>
+        <div className="transfer-account-selectors">
+          <div className="account-choice-panel">
+            <span>转出</span>
+            <div className="account-button-grid">
+              {accountNames.map((name) => (
+                <button type="button" key={name} className={account === name ? "selected" : ""} onClick={() => setAccount(name)}>
+                  {name}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="account-choice-panel">
+            <span>转入</span>
+            <div className="account-button-grid">
+              {accountNames.map((name) => (
+                <button type="button" key={name} className={toAccount === name ? "selected" : ""} onClick={() => setToAccount(name)}>
+                  {name}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       ) : (
         <div className="category-grid">
@@ -865,22 +871,20 @@ function EntryForm({
                 )}
               </BackedDatePicker>
             </div>
-            {type !== "transfer" && (
-              <div className="choice-wrap">
-                <BackedPicker historyKey="localMoneyEntryAccountPicker" columns={accountColumns} value={[account]} onConfirm={(value) => setAccount(String(value[0]))}>
-                  {(_, actions) => (
-                    <Button className="choice-button" color="primary" fill="solid" onClick={actions.open}>
-                      {account}
-                    </Button>
-                  )}
-                </BackedPicker>
-              </div>
-            )}
           </div>
           <label className="field note-field">
             <input placeholder="备注" value={note} onChange={(event) => setNote(event.target.value)} />
           </label>
         </div>
+        {type !== "transfer" && (
+          <div className="account-button-grid entry-account-buttons">
+            {accountNames.map((name) => (
+              <button type="button" key={name} className={account === name ? "selected" : ""} onClick={() => setAccount(name)}>
+                {name}
+              </button>
+            ))}
+          </div>
+        )}
         <label className="field amount-field">
           <span>金额</span>
           <output>{amount || "0.00"}</output>
