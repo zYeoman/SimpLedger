@@ -112,12 +112,24 @@ type View = "home" | "assets" | "stats" | "settings";
 
 const activeHistoryPopupTokens = new Set<symbol>();
 const viewOrder: View[] = ["home", "assets", "stats", "settings"];
+const homeAccountFiltersStorageKey = "localMoneyHomeAccountFilters";
 
 const typeLabel: Record<TransactionType, string> = {
   expense: "支出",
   income: "收入",
   transfer: "转账",
 };
+
+function readHomeAccountFilters() {
+  if (typeof window === "undefined") return [];
+  try {
+    const value = window.localStorage.getItem(homeAccountFiltersStorageKey);
+    const parsed = value ? JSON.parse(value) : [];
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [];
+  } catch {
+    return [];
+  }
+}
 
 function App() {
   const [view, setView] = useState<View>("home");
@@ -131,7 +143,7 @@ function App() {
   const [statsMode, setStatsMode] = useState<"month" | "year">("month");
   const [statsMonth, setStatsMonth] = useState(monthKey());
   const [statsYear, setStatsYear] = useState(String(new Date().getFullYear()));
-  const [homeAccountFilters, setHomeAccountFilters] = useState<string[]>([]);
+  const [homeAccountFilters, setHomeAccountFilters] = useState<string[]>(readHomeAccountFilters);
   const [isSeedReady, setIsSeedReady] = useState(false);
   const categoryRows = useLiveQuery(() => db.categories.orderBy("type").toArray(), []);
   const accountRows = useLiveQuery(() => db.accounts.orderBy("createdAt").toArray(), []);
@@ -163,6 +175,10 @@ function App() {
   useEffect(() => {
     viewRef.current = view;
   }, [view]);
+
+  useEffect(() => {
+    window.localStorage.setItem(homeAccountFiltersStorageKey, JSON.stringify(homeAccountFilters));
+  }, [homeAccountFilters]);
 
   useEffect(() => {
     function handlePopState(event: PopStateEvent) {
@@ -217,6 +233,14 @@ function App() {
             {titleForView(view)}
           </h1>
         </div>
+        {view === "home" && isDataReady && (
+          <HomeAccountFilterControls
+            className="topbar-animated"
+            accounts={accounts}
+            accountFilters={homeAccountFilters}
+            setAccountFilters={setHomeAccountFilters}
+          />
+        )}
         {view === "stats" && (
           <StatsPeriodControls
             className="topbar-animated"
@@ -326,14 +350,11 @@ function App() {
       return (
         <HomeView
           items={homeItems}
-          detailItems={homeDetailItems}
-          categories={categories}
-          accounts={accounts}
-          accountFilters={homeAccountFilters}
-          setAccountFilters={setHomeAccountFilters}
-          goAdd={() => openEntryPage()}
-          goEdit={openEntryPage}
-        />
+            detailItems={homeDetailItems}
+            categories={categories}
+            goAdd={() => openEntryPage()}
+            goEdit={openEntryPage}
+          />
       );
     }
     if (targetView === "assets") return <AssetsView items={transactions} accounts={accounts} />;
@@ -522,27 +543,17 @@ function AccountSelectButton({
   );
 }
 
-function HomeView({
-  items,
-  detailItems,
-  categories,
+function HomeAccountFilterControls({
+  className,
   accounts,
   accountFilters,
   setAccountFilters,
-  goAdd,
-  goEdit,
 }: {
-  items: Transaction[];
-  detailItems: Transaction[];
-  categories: ReturnType<typeof useCategories>;
+  className?: string;
   accounts: Account[];
   accountFilters: string[];
   setAccountFilters: React.Dispatch<React.SetStateAction<string[]>>;
-  goAdd: () => void;
-  goEdit: (transaction: Transaction) => void;
 }) {
-  const expense = sumByType(items, "expense");
-  const income = sumByType(items, "income");
   const accountNames = accounts.length ? accounts.map((item) => item.name) : defaultAccounts;
 
   function toggleAccountFilter(account: string) {
@@ -550,17 +561,40 @@ function HomeView({
   }
 
   return (
+    <div className={`topbar-account-filter ${className ?? ""}`}>
+      {accountNames.map((account) => (
+        <Button
+          className={`stats-control-button account-filter-button ${accountFilters.includes(account) ? "selected" : "unselected"}`}
+          color="primary"
+          fill="solid"
+          key={account}
+          onClick={() => toggleAccountFilter(account)}
+        >
+          {account}
+        </Button>
+      ))}
+    </div>
+  );
+}
+
+function HomeView({
+  items,
+  detailItems,
+  categories,
+  goAdd,
+  goEdit,
+}: {
+  items: Transaction[];
+  detailItems: Transaction[];
+  categories: ReturnType<typeof useCategories>;
+  goAdd: () => void;
+  goEdit: (transaction: Transaction) => void;
+}) {
+  const expense = sumByType(items, "expense");
+  const income = sumByType(items, "income");
+
+  return (
     <>
-      <div className="account-filter">
-        <button className={accountFilters.length === 0 ? "selected" : ""} onClick={() => setAccountFilters([])}>
-          全部
-        </button>
-        {accountNames.map((account) => (
-          <button key={account} className={accountFilters.includes(account) ? "selected" : ""} onClick={() => toggleAccountFilter(account)}>
-            {account}
-          </button>
-        ))}
-      </div>
       <section className="metric-grid">
         <Metric label="本月支出" value={currency.format(expense)} tone="expense" />
         <Metric label="本月收入" value={currency.format(income)} tone="income" />

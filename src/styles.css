@@ -1085,6 +1085,44 @@ h1 {
   margin-bottom: 0;
 }
 
+.topbar-account-filter {
+  display: flex;
+  max-width: min(62vw, 320px);
+  gap: 0;
+  overflow-x: auto;
+  padding: 2px 0;
+  scrollbar-width: none;
+}
+
+.topbar-account-filter::-webkit-scrollbar {
+  display: none;
+}
+
+.account-filter-button {
+  flex: 0 0 auto;
+  --border-radius: 0;
+  border-radius: 0;
+}
+
+.account-filter-button:first-child {
+  --border-radius: 7px 0 0 7px;
+  border-radius: 7px 0 0 7px;
+}
+
+.account-filter-button:last-child {
+  --border-radius: 0 7px 7px 0;
+  border-radius: 0 7px 7px 0;
+}
+
+.account-filter-button:only-child {
+  --border-radius: 7px;
+  border-radius: 7px;
+}
+
+.account-filter-button.unselected {
+  opacity: 0.58;
+}
+
 .stats-control-button {
   min-height: 34px;
   white-space: nowrap;
