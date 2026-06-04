@@ -101,51 +101,22 @@ h1 {
   overflow-x: hidden;
 }
 
-.view-viewport {
+.view-swiper {
+  width: 100%;
   min-width: 0;
-  overflow-x: hidden;
-}
-
-.view-stage {
-  display: flex;
-  width: 200%;
-  align-items: flex-start;
-}
-
-.view-stage.move-forward {
-  animation: tab-pan-forward 220ms ease-out forwards;
-}
-
-.view-stage.move-back {
-  transform: translateX(-50%);
-  animation: tab-pan-back 220ms ease-out forwards;
+  min-height: calc(100dvh - 172px);
 }
 
 .view-panel {
   display: grid;
-  flex: 0 0 50%;
+  align-content: start;
   gap: 14px;
   min-width: 0;
 }
 
-@keyframes tab-pan-forward {
-  from {
-    transform: translateX(0);
-  }
-
-  to {
-    transform: translateX(-50%);
-  }
-}
-
-@keyframes tab-pan-back {
-  from {
-    transform: translateX(-50%);
-  }
-
-  to {
-    transform: translateX(0);
-  }
+.view-swiper .swiper-slide {
+  height: auto;
+  min-height: calc(100dvh - 172px);
 }
 
 .account-filter {
@@ -238,12 +209,9 @@ h1 {
   gap: 12px;
 }
 
-.metric,
 .panel {
-  border: 1px solid #e6ded1;
   border-radius: 8px;
   background: #fffaf2;
-  box-shadow: 0 8px 24px rgba(64, 51, 37, 0.07);
 }
 
 .metric {
@@ -282,8 +250,6 @@ h1 {
 }
 
 .detail-panel {
-  border-inline: 0;
-  border-radius: 0;
   padding: 16px 0;
 }
 

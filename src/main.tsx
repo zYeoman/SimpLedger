@@ -3,6 +3,9 @@ import { createRoot } from "react-dom/client";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Button, DatePicker, Picker, Popup, TabBar } from "antd-mobile";
 import "antd-mobile/bundle/style.css";
+import type { Swiper as SwiperClass } from "swiper";
+import { Swiper, SwiperSlide } from "swiper/react";
+import "swiper/css";
 import {
   ArrowDownCircle,
   ArrowUpCircle,
@@ -106,8 +109,6 @@ import { currency, fileSafeStamp, getMonthRange, groupByDate, monthKey, sumByTyp
 import "./styles.css";
 
 type View = "home" | "assets" | "stats" | "settings";
-type ViewSlideDirection = "forward" | "back";
-type ViewTransition = { from: View; to: View; direction: ViewSlideDirection };
 
 const activeHistoryPopupTokens = new Set<symbol>();
 const viewOrder: View[] = ["home", "assets", "stats", "settings"];
@@ -121,7 +122,7 @@ const typeLabel: Record<TransactionType, string> = {
 function App() {
   const [view, setView] = useState<View>("home");
   const viewRef = useRef<View>("home");
-  const [viewTransition, setViewTransition] = useState<ViewTransition | null>(null);
+  const swiperRef = useRef<SwiperClass | null>(null);
   const [isEntryOpen, setIsEntryOpen] = useState(false);
   const [isEntryClosing, setIsEntryClosing] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
@@ -230,25 +231,25 @@ function App() {
       </header>
 
       <section className="content">
-        {viewTransition ? (
-          <div className="view-viewport">
-            <div className={`view-stage move-${viewTransition.direction}`} onAnimationEnd={() => setViewTransition(null)}>
-              {viewTransition.direction === "forward" ? (
-                <>
-                  <div className="view-panel">{renderView(viewTransition.from)}</div>
-                  <div className="view-panel">{renderView(viewTransition.to)}</div>
-                </>
-              ) : (
-                <>
-                  <div className="view-panel">{renderView(viewTransition.to)}</div>
-                  <div className="view-panel">{renderView(viewTransition.from)}</div>
-                </>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="view-panel">{renderView(view)}</div>
-        )}
+        <Swiper
+          className="view-swiper"
+          autoHeight
+          initialSlide={viewOrder.indexOf(view)}
+          noSwipingSelector="input, textarea, select, button, .account-filter, .adm-popup, .adm-picker, .adm-date-picker"
+          onSwiper={(swiper) => {
+            swiperRef.current = swiper;
+          }}
+          onSlideChange={(swiper) => {
+            const nextView = viewOrder[swiper.activeIndex];
+            if (nextView && nextView !== viewRef.current) navigateView(nextView);
+          }}
+        >
+          {viewOrder.map((item) => (
+            <SwiperSlide key={item}>
+              <div className="view-panel">{renderView(item)}</div>
+            </SwiperSlide>
+          ))}
+        </Swiper>
       </section>
 
       {isEntryOpen && (
@@ -314,13 +315,9 @@ function App() {
   function switchView(nextView: View) {
     const currentView = viewRef.current;
     if (nextView === currentView) return;
-    setViewTransition({
-      from: currentView,
-      to: nextView,
-      direction: viewOrder.indexOf(nextView) > viewOrder.indexOf(currentView) ? "forward" : "back",
-    });
     viewRef.current = nextView;
     setView(nextView);
+    swiperRef.current?.slideTo(viewOrder.indexOf(nextView));
   }
 
   function renderView(targetView: View) {
