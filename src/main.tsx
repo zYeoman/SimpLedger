@@ -525,7 +525,7 @@ function HomeView({
         <Metric label="本月支出" value={currency.format(expense)} tone="expense" />
         <Metric label="本月收入" value={currency.format(income)} tone="income" />
       </section>
-      <section className="panel">
+      <section className="panel detail-panel">
         <div className="section-title">
           <h2>明细</h2>
         </div>
@@ -540,11 +540,34 @@ type VirtualTransactionRow =
   | { type: "date"; key: string; date: string; records: Transaction[] }
   | { type: "transaction"; key: string; item: Transaction };
 
-const virtualRowHeights: Record<VirtualTransactionRow["type"], number> = {
+const baseVirtualRowHeights: Record<VirtualTransactionRow["type"], number> = {
   month: 42,
   date: 58,
-  transaction: 88,
+  transaction: 96,
 };
+
+function getTransactionRowHeight() {
+  if (typeof window === "undefined") return baseVirtualRowHeights.transaction;
+  if (window.innerWidth <= 430) return 86;
+  if (window.innerWidth <= 520) return 92;
+  return baseVirtualRowHeights.transaction;
+}
+
+function useTransactionRowHeight() {
+  const [height, setHeight] = useState(getTransactionRowHeight);
+
+  useEffect(() => {
+    function updateHeight() {
+      setHeight(getTransactionRowHeight());
+    }
+
+    updateHeight();
+    window.addEventListener("resize", updateHeight);
+    return () => window.removeEventListener("resize", updateHeight);
+  }, []);
+
+  return height;
+}
 
 function VirtualTransactionList({
   items,
@@ -561,6 +584,14 @@ function VirtualTransactionList({
   }, "localMoneyVirtualTransactionDetail");
   const [viewport, setViewport] = useState({ scrollY: 0, height: 0, top: 0 });
   const listRef = useRef<HTMLDivElement>(null);
+  const transactionRowHeight = useTransactionRowHeight();
+  const virtualRowHeights = useMemo(
+    () => ({
+      ...baseVirtualRowHeights,
+      transaction: transactionRowHeight,
+    }),
+    [transactionRowHeight],
+  );
 
   const rows = useMemo(() => {
     const dateGroups = groupByDate(items);
@@ -590,7 +621,7 @@ function VirtualTransactionList({
       offset += virtualRowHeights[row.type];
       return top;
     });
-  }, [rows]);
+  }, [rows, virtualRowHeights]);
 
   const totalHeight = rows.reduce((sum, row) => sum + virtualRowHeights[row.type], 0);
   const visibleTop = Math.max(0, viewport.scrollY - viewport.top - 700);
@@ -646,7 +677,7 @@ function VirtualTransactionList({
               <span>类型</span>
               <strong>{typeLabel[selectedItem.type]}</strong>
               <span>金额</span>
-              <strong>{currency.format(selectedItem.amount)}</strong>
+              <strong className="amount-value">{currency.format(selectedItem.amount)}</strong>
               <span>分类</span>
               <strong>{selectedItem.category}</strong>
               <span>{selectedItem.type === "transfer" ? "转出账户" : "账户"}</span>
@@ -697,8 +728,9 @@ function VirtualTransactionItem({
   const meta = getCategoryMeta(item, categories);
   return (
     <article className="transaction-row clickable timeline-row" onClick={() => onSelect(item)}>
-      <time>{formatRecordTime(item)}</time>
-      <div className="timeline-dot" />
+      <div className="timeline-stamp">
+        <time>{formatRecordTime(item)}</time>
+      </div>
       <div
         className="transaction-pill"
         style={
@@ -1074,8 +1106,9 @@ function TransactionList({
               const meta = getCategoryMeta(item, categories);
               return (
                 <article key={item.id} className="transaction-row clickable timeline-row" onClick={() => selectItem(item)}>
-                  <time>{formatRecordTime(item)}</time>
-                  <div className="timeline-dot" />
+                  <div className="timeline-stamp">
+                    <time>{formatRecordTime(item)}</time>
+                  </div>
                   <div
                     className="transaction-pill"
                     style={
@@ -1115,7 +1148,7 @@ function TransactionList({
               <span>类型</span>
               <strong>{typeLabel[selectedItem.type]}</strong>
               <span>金额</span>
-              <strong>{currency.format(selectedItem.amount)}</strong>
+              <strong className="amount-value">{currency.format(selectedItem.amount)}</strong>
               <span>分类</span>
               <strong>{selectedItem.category}</strong>
               <span>{selectedItem.type === "transfer" ? "转出账户" : "账户"}</span>

@@ -1,6 +1,8 @@
 :root {
   --adm-color-primary: #2f6f5e;
   --adm-font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --amount-font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", Roboto, "Noto Sans",
+    "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: #27322f;
   background: #f7f3ec;
@@ -138,6 +140,19 @@ h1 {
   line-height: 1;
 }
 
+.summary-band strong,
+.metric strong,
+.amount-field output,
+.amount-value,
+.stats-summary strong,
+.stats-section-title strong,
+.stats-rank-title span,
+.stats-rank-row > em,
+.asset-row-balance strong,
+.asset-flow-line strong {
+  font-family: var(--amount-font-family);
+}
+
 .summary-band button,
 .primary-button {
   display: inline-flex;
@@ -199,6 +214,26 @@ h1 {
 
 .panel {
   padding: 16px;
+}
+
+.detail-panel {
+  border-inline: 0;
+  border-radius: 0;
+  padding: 16px 0;
+}
+
+.detail-panel .section-title,
+.detail-panel .empty-state {
+  padding-inline: 16px;
+}
+
+.detail-panel .virtual-month-title {
+  padding-inline: 16px;
+}
+
+.detail-panel .date-header {
+  margin-left: 0;
+  padding-inline: 16px;
 }
 
 .section-title {
@@ -685,7 +720,7 @@ h1 {
 }
 
 .virtual-transaction-row.transaction {
-  height: 88px;
+  height: 96px;
 }
 
 .virtual-month-title {
@@ -769,27 +804,46 @@ h1 {
 }
 
 .transaction-row.timeline-row {
-  grid-template-columns: 48px 10px minmax(0, 1fr);
-  gap: 10px;
-  min-height: 80px;
+  grid-template-columns: 58px minmax(0, 1fr);
+  grid-template-rows: 14px auto;
+  align-items: start;
+  gap: 6px 8px;
+  min-height: 96px;
+  padding-top: 2px;
 }
 
-.transaction-row.timeline-row time {
+.timeline-stamp {
+  position: relative;
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-height: 14px;
+  padding-right: 16px;
+  padding-left: 16px;
+}
+
+.timeline-stamp::after {
+  content: "";
+  display: block;
+  height: 1px;
+  border-radius: 999px;
+  background: #e5dfd5;
+}
+
+.timeline-stamp time {
   color: #343942;
-  font-size: 18px;
-  font-weight: 900;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", Roboto, "Noto Sans",
+    "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+  font-size: 16px;
+  font-weight: 550;
+  line-height: 1;
   text-align: right;
 }
 
-.timeline-dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: #f0f1f4;
-  box-shadow: 0 -38px 0 -4px #eef0f3;
-}
-
 .transaction-pill {
+  grid-column: 2;
   display: grid;
   grid-template-columns: 58px minmax(0, 1fr) auto;
   align-items: center;
@@ -798,6 +852,18 @@ h1 {
   border-radius: 999px;
   background: var(--row-bg);
   padding: 8px 16px 8px 8px;
+}
+
+.timeline-row .transaction-pill {
+  grid-template-columns: 52px minmax(0, 1fr) auto;
+  min-height: 70px;
+  margin-right: 16px;
+  padding: 6px 14px 6px 6px;
+}
+
+.timeline-row .category-icon {
+  width: 52px;
+  height: 52px;
 }
 
 .category-icon {
@@ -861,7 +927,7 @@ h1 {
 .row-amount {
   color: #343942;
   font-size: 20px;
-  font-weight: 800;
+  font-weight: 500;
   white-space: nowrap;
 }
 
@@ -1906,12 +1972,29 @@ h1 {
   }
 
   .transaction-row.timeline-row {
-    grid-template-columns: 42px 8px minmax(0, 1fr);
-    gap: 8px;
+    grid-template-columns: 52px minmax(0, 1fr);
+    grid-template-rows: 14px auto;
+    gap: 6px 8px;
+    min-height: 92px;
+    padding-top: 2px;
   }
 
-  .transaction-row.timeline-row time {
-    font-size: 16px;
+  .virtual-transaction-row.transaction {
+    height: 92px;
+  }
+
+  .timeline-stamp {
+    grid-template-columns: 52px minmax(0, 1fr);
+    gap: 8px;
+    padding-right: 14px;
+  }
+
+  .timeline-stamp time {
+    font-size: 15px;
+  }
+
+  .timeline-stamp::before {
+    left: 60px;
   }
 
   .transaction-pill {
@@ -1922,6 +2005,18 @@ h1 {
   }
 
   .category-icon {
+    width: 48px;
+    height: 48px;
+  }
+
+  .timeline-row .transaction-pill {
+    grid-template-columns: 48px minmax(0, 1fr) auto;
+    min-height: 66px;
+    margin-right: 14px;
+    padding: 6px 12px 6px 6px;
+  }
+
+  .timeline-row .category-icon {
     width: 48px;
     height: 48px;
   }
@@ -1959,13 +2054,31 @@ h1 {
   }
 
   .transaction-row.timeline-row {
-    grid-template-columns: 42px 8px minmax(0, 1fr);
-    gap: 8px;
-    min-height: 64px;
+    grid-template-columns: 48px minmax(0, 1fr);
+    grid-template-rows: 13px auto;
+    gap: 6px 7px;
+    min-height: 86px;
+    padding-top: 2px;
   }
 
-  .transaction-row.timeline-row time {
-    font-size: 15px;
+  .virtual-transaction-row.transaction {
+    height: 86px;
+  }
+
+  .timeline-stamp {
+    grid-template-columns: 48px minmax(0, 1fr);
+    gap: 7px;
+    padding-right: 12px;
+  }
+
+  .timeline-stamp time {
+    font-size: 14px;
+  }
+
+  .timeline-stamp::before {
+    left: 55px;
+    width: 8px;
+    height: 8px;
   }
 
   .transaction-pill {
@@ -1976,6 +2089,17 @@ h1 {
   }
 
   .category-icon {
+    width: 44px;
+    height: 44px;
+  }
+
+  .timeline-row .transaction-pill {
+    grid-template-columns: 44px minmax(0, 1fr) auto;
+    min-height: 60px;
+    margin-right: 16px;
+  }
+
+  .timeline-row .category-icon {
     width: 44px;
     height: 44px;
   }
