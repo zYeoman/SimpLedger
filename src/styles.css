@@ -81,6 +81,54 @@ h1 {
 .content {
   display: grid;
   gap: 14px;
+  overflow-x: hidden;
+}
+
+.view-viewport {
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+.view-stage {
+  display: flex;
+  width: 200%;
+  align-items: flex-start;
+}
+
+.view-stage.move-forward {
+  animation: tab-pan-forward 220ms ease-out forwards;
+}
+
+.view-stage.move-back {
+  transform: translateX(-50%);
+  animation: tab-pan-back 220ms ease-out forwards;
+}
+
+.view-panel {
+  display: grid;
+  flex: 0 0 50%;
+  gap: 14px;
+  min-width: 0;
+}
+
+@keyframes tab-pan-forward {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes tab-pan-back {
+  from {
+    transform: translateX(-50%);
+  }
+
+  to {
+    transform: translateX(0);
+  }
 }
 
 .account-filter {

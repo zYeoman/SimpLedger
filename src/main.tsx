@@ -106,8 +106,11 @@ import { currency, fileSafeStamp, getMonthRange, groupByDate, monthKey, sumByTyp
 import "./styles.css";
 
 type View = "home" | "assets" | "stats" | "settings";
+type ViewSlideDirection = "forward" | "back";
+type ViewTransition = { from: View; to: View; direction: ViewSlideDirection };
 
 const activeHistoryPopupTokens = new Set<symbol>();
+const viewOrder: View[] = ["home", "assets", "stats", "settings"];
 
 const typeLabel: Record<TransactionType, string> = {
   expense: "支出",
@@ -118,6 +121,7 @@ const typeLabel: Record<TransactionType, string> = {
 function App() {
   const [view, setView] = useState<View>("home");
   const viewRef = useRef<View>("home");
+  const [viewTransition, setViewTransition] = useState<ViewTransition | null>(null);
   const [isEntryOpen, setIsEntryOpen] = useState(false);
   const [isEntryClosing, setIsEntryClosing] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
@@ -172,13 +176,11 @@ function App() {
       }
       const stateView = state.localMoneyView as View | undefined;
       if (stateView) {
-        viewRef.current = stateView;
-        setView(stateView);
+        switchView(stateView);
         return;
       }
       if (viewRef.current !== "home") {
-        viewRef.current = "home";
-        setView("home");
+        switchView("home");
       }
     }
 
@@ -225,32 +227,24 @@ function App() {
       </header>
 
       <section className="content">
-        {!isDataReady && <LoadingState />}
-        {isDataReady && view === "home" && (
-          <HomeView
-            items={homeItems}
-            detailItems={homeDetailItems}
-            categories={categories}
-            accounts={accounts}
-            accountFilters={homeAccountFilters}
-            setAccountFilters={setHomeAccountFilters}
-            goAdd={() => openEntryPage()}
-            goEdit={openEntryPage}
-          />
-        )}
-        {isDataReady && view === "assets" && <AssetsView items={transactions} accounts={accounts} />}
-        {isDataReady && view === "stats" && (
-          <StatsView
-            items={statsItems}
-            categories={categories}
-            accounts={accounts}
-            mode={statsMode}
-            month={statsMonth}
-            year={statsYear}
-          />
-        )}
-        {isDataReady && view === "settings" && (
-          <SettingsView categories={categories} transactions={transactions} accounts={accounts} transferRules={transferRules} />
+        {viewTransition ? (
+          <div className="view-viewport">
+            <div className={`view-stage move-${viewTransition.direction}`} onAnimationEnd={() => setViewTransition(null)}>
+              {viewTransition.direction === "forward" ? (
+                <>
+                  <div className="view-panel">{renderView(viewTransition.from)}</div>
+                  <div className="view-panel">{renderView(viewTransition.to)}</div>
+                </>
+              ) : (
+                <>
+                  <div className="view-panel">{renderView(viewTransition.to)}</div>
+                  <div className="view-panel">{renderView(viewTransition.from)}</div>
+                </>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="view-panel">{renderView(view)}</div>
         )}
       </section>
 
@@ -300,8 +294,7 @@ function App() {
       const state = window.history.state && typeof window.history.state === "object" ? { ...window.history.state } : {};
       delete state.localMoneyView;
       window.history.replaceState(state, "", window.location.href);
-      viewRef.current = "home";
-      setView("home");
+      switchView("home");
       return;
     }
 
@@ -312,8 +305,51 @@ function App() {
     } else {
       window.history.replaceState(state, "", window.location.href);
     }
+    switchView(nextView);
+  }
+
+  function switchView(nextView: View) {
+    const currentView = viewRef.current;
+    if (nextView === currentView) return;
+    setViewTransition({
+      from: currentView,
+      to: nextView,
+      direction: viewOrder.indexOf(nextView) > viewOrder.indexOf(currentView) ? "forward" : "back",
+    });
     viewRef.current = nextView;
     setView(nextView);
+  }
+
+  function renderView(targetView: View) {
+    if (!isDataReady) return <LoadingState />;
+    if (targetView === "home") {
+      return (
+        <HomeView
+          items={homeItems}
+          detailItems={homeDetailItems}
+          categories={categories}
+          accounts={accounts}
+          accountFilters={homeAccountFilters}
+          setAccountFilters={setHomeAccountFilters}
+          goAdd={() => openEntryPage()}
+          goEdit={openEntryPage}
+        />
+      );
+    }
+    if (targetView === "assets") return <AssetsView items={transactions} accounts={accounts} />;
+    if (targetView === "stats") {
+      return (
+        <StatsView
+          items={statsItems}
+          categories={categories}
+          accounts={accounts}
+          mode={statsMode}
+          month={statsMonth}
+          year={statsYear}
+        />
+      );
+    }
+    return <SettingsView categories={categories} transactions={transactions} accounts={accounts} transferRules={transferRules} />;
   }
 
   function closeEntryPage() {
