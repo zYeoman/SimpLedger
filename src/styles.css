@@ -560,6 +560,13 @@ h1 {
   border: 1px solid #e6ded1;
   font-size: 20px;
   font-weight: 800;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.number-pad button:active {
+  filter: brightness(0.9);
+  transition: none;
 }
 
 .number-pad .operator-key {
