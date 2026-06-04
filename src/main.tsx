@@ -107,6 +107,8 @@ import "./styles.css";
 
 type View = "home" | "assets" | "stats" | "settings";
 
+const activeHistoryPopupTokens = new Set<symbol>();
+
 const typeLabel: Record<TransactionType, string> = {
   expense: "支出",
   income: "收入",
@@ -160,6 +162,9 @@ function App() {
   useEffect(() => {
     function handlePopState(event: PopStateEvent) {
       const state = event.state && typeof event.state === "object" ? event.state : {};
+      if (activeHistoryPopupTokens.size > 0) {
+        return;
+      }
       if (isEntryOpenRef.current) {
         if (state.localMoneyEntry) return;
         animateEntryClose();
@@ -347,14 +352,23 @@ function transactionBelongsToAccount(item: Transaction, account: string) {
 function useHistoryBackedPopup(visible: boolean, setVisible: (visible: boolean) => void, stateKey: string) {
   const visibleRef = useRef(visible);
   const pushedRef = useRef(false);
+  const popupTokenRef = useRef(Symbol(stateKey));
 
   useEffect(() => {
     visibleRef.current = visible;
+    if (visible) {
+      activeHistoryPopupTokens.add(popupTokenRef.current);
+    } else {
+      activeHistoryPopupTokens.delete(popupTokenRef.current);
+    }
     if (visible && !pushedRef.current) {
       const currentState = window.history.state && typeof window.history.state === "object" ? window.history.state : {};
       window.history.pushState({ ...currentState, [stateKey]: true }, "", window.location.href);
       pushedRef.current = true;
     }
+    return () => {
+      activeHistoryPopupTokens.delete(popupTokenRef.current);
+    };
   }, [visible, stateKey]);
 
   useEffect(() => {
