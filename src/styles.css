@@ -380,6 +380,39 @@ h1 {
   --background-color: #2f6f5e;
 }
 
+.entry-account-select-button {
+  justify-self: start;
+  min-width: 92px;
+}
+
+.account-select-popup {
+  border-radius: 16px 16px 0 0;
+  background: #f7f3ec;
+  padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+}
+
+.account-option-list {
+  display: grid;
+  gap: 8px;
+}
+
+.account-option-list button {
+  min-height: 46px;
+  border: 1px solid #e6ded1;
+  border-radius: 8px;
+  background: #fffaf2;
+  color: #27322f;
+  padding: 0 12px;
+  text-align: left;
+  font-weight: 900;
+}
+
+.account-option-list button.selected {
+  border-color: #2f6f5e;
+  background: #2f6f5e;
+  color: #fff;
+}
+
 .account-choice-panel {
   display: grid;
   gap: 8px;

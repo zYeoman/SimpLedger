@@ -427,6 +427,51 @@ function BackedDatePicker({ historyKey, children, ...props }: BackedDatePickerPr
   );
 }
 
+function AccountSelectButton({
+  label,
+  value,
+  accounts,
+  onChange,
+  className,
+  historyKey,
+}: {
+  label?: string;
+  value: string;
+  accounts: string[];
+  onChange: (value: string) => void;
+  className: string;
+  historyKey: string;
+}) {
+  const [visible, setVisible] = useState(false);
+  const close = useHistoryBackedPopup(visible, setVisible, historyKey);
+
+  return (
+    <>
+      <Button className={className} color="primary" fill="solid" onClick={() => setVisible(true)}>
+        {[label, value || "选择账户"].filter(Boolean).join(" ")}
+      </Button>
+      <Popup visible={visible} onMaskClick={close} bodyClassName="account-select-popup">
+        <div className="popup-title">{label || "选择账户"}</div>
+        <div className="account-option-list">
+          {accounts.map((account) => (
+            <button
+              type="button"
+              key={account}
+              className={value === account ? "selected" : ""}
+              onClick={() => {
+                onChange(account);
+                close();
+              }}
+            >
+              {account}
+            </button>
+          ))}
+        </div>
+      </Popup>
+    </>
+  );
+}
+
 function HomeView({
   items,
   detailItems,
@@ -818,27 +863,23 @@ function EntryForm({
       </div>
 
       {type === "transfer" ? (
-        <div className="transfer-account-selectors">
-          <div className="account-choice-panel">
-            <span>转出</span>
-            <div className="account-button-grid">
-              {accountNames.map((name) => (
-                <button type="button" key={name} className={account === name ? "selected" : ""} onClick={() => setAccount(name)}>
-                  {name}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="account-choice-panel">
-            <span>转入</span>
-            <div className="account-button-grid">
-              {accountNames.map((name) => (
-                <button type="button" key={name} className={toAccount === name ? "selected" : ""} onClick={() => setToAccount(name)}>
-                  {name}
-                </button>
-              ))}
-            </div>
-          </div>
+        <div className="transfer-account-grid">
+          <AccountSelectButton
+            label="转出"
+            value={account}
+            accounts={accountNames}
+            onChange={setAccount}
+            className="transfer-account-button"
+            historyKey="localMoneyEntryTransferFromAccountPopup"
+          />
+          <AccountSelectButton
+            label="转入"
+            value={toAccount}
+            accounts={accountNames}
+            onChange={setToAccount}
+            className="transfer-account-button"
+            historyKey="localMoneyEntryTransferToAccountPopup"
+          />
         </div>
       ) : (
         <div className="category-grid">
@@ -877,13 +918,13 @@ function EntryForm({
           </label>
         </div>
         {type !== "transfer" && (
-          <div className="account-button-grid entry-account-buttons">
-            {accountNames.map((name) => (
-              <button type="button" key={name} className={account === name ? "selected" : ""} onClick={() => setAccount(name)}>
-                {name}
-              </button>
-            ))}
-          </div>
+          <AccountSelectButton
+            value={account}
+            accounts={accountNames}
+            onChange={setAccount}
+            className="choice-button entry-account-select-button"
+            historyKey="localMoneyEntryAccountPopup"
+          />
         )}
         <label className="field amount-field">
           <span>金额</span>
