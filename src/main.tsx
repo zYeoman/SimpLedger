@@ -126,7 +126,7 @@ function App() {
   const [statsMode, setStatsMode] = useState<"month" | "year">("month");
   const [statsMonth, setStatsMonth] = useState(monthKey());
   const [statsYear, setStatsYear] = useState(String(new Date().getFullYear()));
-  const [homeAccountFilter, setHomeAccountFilter] = useState("all");
+  const [homeAccountFilters, setHomeAccountFilters] = useState<string[]>([]);
   const [isSeedReady, setIsSeedReady] = useState(false);
   const categoryRows = useLiveQuery(() => db.categories.orderBy("type").toArray(), []);
   const accountRows = useLiveQuery(() => db.accounts.orderBy("createdAt").toArray(), []);
@@ -191,13 +191,13 @@ function App() {
     return transactions.filter((item) => item.date >= range.start && item.date <= range.end);
   }, [transactions]);
   const homeItems = useMemo(() => {
-    if (homeAccountFilter === "all") return currentMonthItems;
-    return currentMonthItems.filter((item) => transactionBelongsToAccount(item, homeAccountFilter));
-  }, [homeAccountFilter, currentMonthItems]);
+    if (homeAccountFilters.length === 0) return currentMonthItems;
+    return currentMonthItems.filter((item) => homeAccountFilters.some((account) => transactionBelongsToAccount(item, account)));
+  }, [homeAccountFilters, currentMonthItems]);
   const homeDetailItems = useMemo(() => {
-    if (homeAccountFilter === "all") return transactions;
-    return transactions.filter((item) => transactionBelongsToAccount(item, homeAccountFilter));
-  }, [homeAccountFilter, transactions]);
+    if (homeAccountFilters.length === 0) return transactions;
+    return transactions.filter((item) => homeAccountFilters.some((account) => transactionBelongsToAccount(item, account)));
+  }, [homeAccountFilters, transactions]);
   const statsItems = useMemo(() => {
     if (statsMode === "month") {
       const range = getMonthRange(statsMonth);
@@ -232,8 +232,8 @@ function App() {
             detailItems={homeDetailItems}
             categories={categories}
             accounts={accounts}
-            accountFilter={homeAccountFilter}
-            setAccountFilter={setHomeAccountFilter}
+            accountFilters={homeAccountFilters}
+            setAccountFilters={setHomeAccountFilters}
             goAdd={() => openEntryPage()}
             goEdit={openEntryPage}
           />
@@ -491,8 +491,8 @@ function HomeView({
   detailItems,
   categories,
   accounts,
-  accountFilter,
-  setAccountFilter,
+  accountFilters,
+  setAccountFilters,
   goAdd,
   goEdit,
 }: {
@@ -500,8 +500,8 @@ function HomeView({
   detailItems: Transaction[];
   categories: ReturnType<typeof useCategories>;
   accounts: Account[];
-  accountFilter: string;
-  setAccountFilter: (value: string) => void;
+  accountFilters: string[];
+  setAccountFilters: React.Dispatch<React.SetStateAction<string[]>>;
   goAdd: () => void;
   goEdit: (transaction: Transaction) => void;
 }) {
@@ -509,14 +509,18 @@ function HomeView({
   const income = sumByType(items, "income");
   const accountNames = accounts.length ? accounts.map((item) => item.name) : defaultAccounts;
 
+  function toggleAccountFilter(account: string) {
+    setAccountFilters((current) => (current.includes(account) ? current.filter((item) => item !== account) : [...current, account]));
+  }
+
   return (
     <>
       <div className="account-filter">
-        <button className={accountFilter === "all" ? "selected" : ""} onClick={() => setAccountFilter("all")}>
+        <button className={accountFilters.length === 0 ? "selected" : ""} onClick={() => setAccountFilters([])}>
           全部
         </button>
         {accountNames.map((account) => (
-          <button key={account} className={accountFilter === account ? "selected" : ""} onClick={() => setAccountFilter(account)}>
+          <button key={account} className={accountFilters.includes(account) ? "selected" : ""} onClick={() => toggleAccountFilter(account)}>
             {account}
           </button>
         ))}
