@@ -212,10 +212,13 @@ function App() {
     <main className="app-shell">
       <header className={`topbar ${view === "stats" ? "stats-topbar" : ""}`}>
         <div>
-          <h1>{titleForView(view)}</h1>
+          <h1 key={view} className="topbar-title">
+            {titleForView(view)}
+          </h1>
         </div>
         {view === "stats" && (
           <StatsPeriodControls
+            className="topbar-animated"
             mode={statsMode}
             setMode={setStatsMode}
             month={statsMonth}
@@ -1621,6 +1624,7 @@ function StatsView({
 }
 
 function StatsPeriodControls({
+  className,
   mode,
   setMode,
   month,
@@ -1628,6 +1632,7 @@ function StatsPeriodControls({
   year,
   setYear,
 }: {
+  className?: string;
   mode: "month" | "year";
   setMode: (mode: "month" | "year") => void;
   month: string;
@@ -1639,7 +1644,7 @@ function StatsPeriodControls({
   const dateLabel = mode === "month" ? formatStatsMonthLabel(month) : year;
 
   return (
-    <div className="stats-controls">
+    <div className={`stats-controls ${className ?? ""}`}>
       <BackedDatePicker
         historyKey="localMoneyStatsDatePicker"
         title={mode === "month" ? "选择月份" : "选择年份"}
