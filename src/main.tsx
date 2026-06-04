@@ -1638,7 +1638,7 @@ function StatsCategorySection({ title, total, data }: { title: string; total: nu
             <div className="stats-donut">
               <ResponsiveContainer width="100%" height={190}>
                 <PieChart>
-                  <Pie data={chartData} dataKey="value" innerRadius={46} outerRadius={78} paddingAngle={2}>
+                  <Pie data={chartData} dataKey="value" innerRadius={46} outerRadius={78} paddingAngle={2} isAnimationActive={false}>
                     {chartData.map((entry) => (
                       <Cell key={entry.name} fill={entry.color} />
                     ))}
