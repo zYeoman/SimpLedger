@@ -47,23 +47,6 @@ button {
   margin-bottom: 20px;
 }
 
-.topbar-title,
-.topbar-animated {
-  animation: topbar-fade-in 180ms ease-out;
-}
-
-@keyframes topbar-fade-in {
-  from {
-    transform: translateY(4px);
-    opacity: 0;
-  }
-
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
 .stats-topbar {
   align-items: center;
 }
@@ -1090,7 +1073,6 @@ h1 {
   max-width: min(62vw, 320px);
   gap: 0;
   overflow-x: auto;
-  padding: 2px 0;
   scrollbar-width: none;
 }
 
