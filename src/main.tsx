@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Button, DatePicker, Picker, Popup, TabBar } from "antd-mobile";
@@ -748,49 +749,51 @@ function VirtualTransactionList({
           </div>
         ))}
       </div>
-      {selectedItem?.id && (
-        <div className="detail-overlay" role="presentation">
-          <button className="detail-backdrop" aria-label="关闭详情" onClick={closeSelectedItem} />
-          <section className="detail-card floating" role="dialog" aria-modal="true" aria-label="账单详情">
-            <div className="detail-grid">
-              <span>类型</span>
-              <strong>{typeLabel[selectedItem.type]}</strong>
-              <span>金额</span>
-              <strong className="amount-value">{currency.format(selectedItem.amount)}</strong>
-              <span>分类</span>
-              <strong>{selectedItem.category}</strong>
-              <span>{selectedItem.type === "transfer" ? "转出账户" : "账户"}</span>
-              <strong>{selectedItem.account || defaultAccounts[0]}</strong>
-              {selectedItem.type === "transfer" && (
-                <>
-                  <span>转入账户</span>
-                  <strong>{selectedItem.toAccount || "未设置"}</strong>
-                </>
-              )}
-              <span>日期</span>
-              <strong>{selectedItem.date}</strong>
-              <span>备注</span>
-              <strong>{selectedItem.note || "无"}</strong>
-            </div>
-            <div className="detail-actions">
-              <button type="button" className="secondary-button danger-button" onClick={() => deleteItem(selectedItem.id!)}>
-                删除
-              </button>
-              <button
-                type="button"
-                className="primary-button"
-                onClick={() => {
-                  const item = selectedItem;
-                  closeSelectedItem();
-                  window.setTimeout(() => goEdit(item), 80);
-                }}
-              >
-                修改
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
+      {selectedItem?.id &&
+        createPortal(
+          <div className="detail-overlay" role="presentation">
+            <button className="detail-backdrop" aria-label="关闭详情" onClick={closeSelectedItem} />
+            <section className="detail-card floating" role="dialog" aria-modal="true" aria-label="账单详情">
+              <div className="detail-grid">
+                <span>类型</span>
+                <strong>{typeLabel[selectedItem.type]}</strong>
+                <span>金额</span>
+                <strong className="amount-value">{currency.format(selectedItem.amount)}</strong>
+                <span>分类</span>
+                <strong>{selectedItem.category}</strong>
+                <span>{selectedItem.type === "transfer" ? "转出账户" : "账户"}</span>
+                <strong>{selectedItem.account || defaultAccounts[0]}</strong>
+                {selectedItem.type === "transfer" && (
+                  <>
+                    <span>转入账户</span>
+                    <strong>{selectedItem.toAccount || "未设置"}</strong>
+                  </>
+                )}
+                <span>日期</span>
+                <strong>{selectedItem.date}</strong>
+                <span>备注</span>
+                <strong>{selectedItem.note || "无"}</strong>
+              </div>
+              <div className="detail-actions">
+                <button type="button" className="secondary-button danger-button" onClick={() => deleteItem(selectedItem.id!)}>
+                  删除
+                </button>
+                <button
+                  type="button"
+                  className="primary-button"
+                  onClick={() => {
+                    const item = selectedItem;
+                    closeSelectedItem();
+                    window.setTimeout(() => goEdit(item), 80);
+                  }}
+                >
+                  修改
+                </button>
+              </div>
+            </section>
+          </div>,
+          document.body,
+        )}
     </>
   );
 }
@@ -1223,49 +1226,51 @@ function TransactionList({
           </div>
         ))}
       </div>
-      {selectedItem?.id && (
-        <div className="detail-overlay" role="presentation">
-          <button className="detail-backdrop" aria-label="关闭详情" onClick={closeSelectedItem} />
-          <section className="detail-card floating" role="dialog" aria-modal="true" aria-label="账单详情">
-            <div className="detail-grid">
-              <span>类型</span>
-              <strong>{typeLabel[selectedItem.type]}</strong>
-              <span>金额</span>
-              <strong className="amount-value">{currency.format(selectedItem.amount)}</strong>
-              <span>分类</span>
-              <strong>{selectedItem.category}</strong>
-              <span>{selectedItem.type === "transfer" ? "转出账户" : "账户"}</span>
-              <strong>{selectedItem.account || defaultAccounts[0]}</strong>
-              {selectedItem.type === "transfer" && (
-                <>
-                  <span>转入账户</span>
-                  <strong>{selectedItem.toAccount || "未设置"}</strong>
-                </>
-              )}
-              <span>日期</span>
-              <strong>{selectedItem.date}</strong>
-              <span>备注</span>
-              <strong>{selectedItem.note || "无"}</strong>
-            </div>
-            <div className="detail-actions">
-              <button type="button" className="secondary-button danger-button" onClick={() => deleteItem(selectedItem.id!)}>
-                删除
-              </button>
-              <button
-                type="button"
-                className="primary-button"
-                onClick={() => {
-                  const item = selectedItem;
-                  closeSelectedItem();
-                  window.setTimeout(() => goEdit(item), 80);
-                }}
-              >
-                修改
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
+      {selectedItem?.id &&
+        createPortal(
+          <div className="detail-overlay" role="presentation">
+            <button className="detail-backdrop" aria-label="关闭详情" onClick={closeSelectedItem} />
+            <section className="detail-card floating" role="dialog" aria-modal="true" aria-label="账单详情">
+              <div className="detail-grid">
+                <span>类型</span>
+                <strong>{typeLabel[selectedItem.type]}</strong>
+                <span>金额</span>
+                <strong className="amount-value">{currency.format(selectedItem.amount)}</strong>
+                <span>分类</span>
+                <strong>{selectedItem.category}</strong>
+                <span>{selectedItem.type === "transfer" ? "转出账户" : "账户"}</span>
+                <strong>{selectedItem.account || defaultAccounts[0]}</strong>
+                {selectedItem.type === "transfer" && (
+                  <>
+                    <span>转入账户</span>
+                    <strong>{selectedItem.toAccount || "未设置"}</strong>
+                  </>
+                )}
+                <span>日期</span>
+                <strong>{selectedItem.date}</strong>
+                <span>备注</span>
+                <strong>{selectedItem.note || "无"}</strong>
+              </div>
+              <div className="detail-actions">
+                <button type="button" className="secondary-button danger-button" onClick={() => deleteItem(selectedItem.id!)}>
+                  删除
+                </button>
+                <button
+                  type="button"
+                  className="primary-button"
+                  onClick={() => {
+                    const item = selectedItem;
+                    closeSelectedItem();
+                    window.setTimeout(() => goEdit(item), 80);
+                  }}
+                >
+                  修改
+                </button>
+              </div>
+            </section>
+          </div>,
+          document.body,
+        )}
     </>
   );
 }
