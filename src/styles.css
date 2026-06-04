@@ -380,11 +380,6 @@ h1 {
   --background-color: #2f6f5e;
 }
 
-.entry-account-select-button {
-  justify-self: start;
-  min-width: 92px;
-}
-
 .account-select-popup {
   border-radius: 16px 16px 0 0;
   background: #f7f3ec;

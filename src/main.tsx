@@ -912,20 +912,22 @@ function EntryForm({
                 )}
               </BackedDatePicker>
             </div>
+            {type !== "transfer" && (
+              <div className="choice-wrap">
+                <AccountSelectButton
+                  value={account}
+                  accounts={accountNames}
+                  onChange={setAccount}
+                  className="choice-button"
+                  historyKey="localMoneyEntryAccountPopup"
+                />
+              </div>
+            )}
           </div>
           <label className="field note-field">
             <input placeholder="备注" value={note} onChange={(event) => setNote(event.target.value)} />
           </label>
         </div>
-        {type !== "transfer" && (
-          <AccountSelectButton
-            value={account}
-            accounts={accountNames}
-            onChange={setAccount}
-            className="choice-button entry-account-select-button"
-            historyKey="localMoneyEntryAccountPopup"
-          />
-        )}
         <label className="field amount-field">
           <span>金额</span>
           <output>{amount || "0.00"}</output>
