@@ -107,6 +107,14 @@ import {
   type TransferRule,
 } from "./db";
 import { currency, fileSafeStamp, getMonthRange, groupByDate, monthKey, sumByType, todayInputValue } from "./utils";
+import {
+  downloadLatestWebdavBackup,
+  loadWebdavConfig,
+  saveWebdavConfig,
+  shouldRunAutoWebdavBackup,
+  uploadWebdavBackup,
+  type WebdavConfig,
+} from "./webdav";
 import "./styles.css";
 
 type View = "home" | "assets" | "stats" | "settings";
@@ -141,6 +149,7 @@ function App() {
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const isEntryOpenRef = useRef(false);
   const entryHistoryPushedRef = useRef(false);
+  const autoWebdavBackupStartedRef = useRef(false);
   const [statsMode, setStatsMode] = useState<"month" | "year">("month");
   const [statsMonth, setStatsMonth] = useState(monthKey());
   const [statsYear, setStatsYear] = useState(String(new Date().getFullYear()));
@@ -180,6 +189,21 @@ function App() {
   useEffect(() => {
     window.localStorage.setItem(homeAccountFiltersStorageKey, JSON.stringify(homeAccountFilters));
   }, [homeAccountFilters]);
+
+  useEffect(() => {
+    if (!isDataReady || autoWebdavBackupStartedRef.current) return;
+    const config = loadWebdavConfig();
+    if (!shouldRunAutoWebdavBackup(config)) return;
+    autoWebdavBackupStartedRef.current = true;
+    exportBackup()
+      .then((payload) => uploadWebdavBackup(config, payload))
+      .then(() => {
+        saveWebdavConfig({ ...config, lastAutoBackupDate: todayInputValue() });
+      })
+      .catch(() => {
+        autoWebdavBackupStartedRef.current = false;
+      });
+  }, [isDataReady]);
 
   useEffect(() => {
     function handlePopState(event: PopStateEvent) {
@@ -1823,12 +1847,19 @@ function SettingsView({
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [updateStatus, setUpdateStatus] = useState("");
+  const [webdavStatus, setWebdavStatus] = useState("");
+  const [webdavConfig, setWebdavConfig] = useState<WebdavConfig>(loadWebdavConfig);
+  const [isWebdavSettingsOpen, setIsWebdavSettingsOpen] = useState(false);
   const [isAccountSettingsOpen, setIsAccountSettingsOpen] = useState(false);
   const [isTransferRulesOpen, setIsTransferRulesOpen] = useState(false);
   const [isCategorySettingsOpen, setIsCategorySettingsOpen] = useState(false);
   const closeAccountSettings = useHistoryBackedPopup(isAccountSettingsOpen, setIsAccountSettingsOpen, "localMoneyAccountSettings");
   const closeTransferRules = useHistoryBackedPopup(isTransferRulesOpen, setIsTransferRulesOpen, "localMoneyRecurringRules");
   const closeCategorySettings = useHistoryBackedPopup(isCategorySettingsOpen, setIsCategorySettingsOpen, "localMoneyCategorySettings");
+
+  useEffect(() => {
+    saveWebdavConfig(webdavConfig);
+  }, [webdavConfig]);
 
   async function downloadBackup() {
     const payload = await exportBackup();
@@ -1846,6 +1877,32 @@ function SettingsView({
     const payload = JSON.parse(await file.text()) as BackupPayload;
     await importBackup(payload);
     event.target.value = "";
+  }
+
+  async function backupToWebdav() {
+    try {
+      setWebdavStatus("正在备份到 WebDAV...");
+      const payload = await exportBackup();
+      await uploadWebdavBackup(webdavConfig, payload);
+      const nextConfig = { ...webdavConfig, lastAutoBackupDate: todayInputValue() };
+      setWebdavConfig(nextConfig);
+      saveWebdavConfig(nextConfig);
+      setWebdavStatus("WebDAV 备份完成");
+    } catch (error) {
+      setWebdavStatus(error instanceof Error ? error.message : "WebDAV 备份失败");
+    }
+  }
+
+  async function restoreFromWebdav() {
+    if (!window.confirm("从 WebDAV 恢复会覆盖当前本地数据，确定继续吗？")) return;
+    try {
+      setWebdavStatus("正在从 WebDAV 恢复...");
+      const payload = await downloadLatestWebdavBackup(webdavConfig);
+      await importBackup(payload);
+      setWebdavStatus("WebDAV 恢复完成");
+    } catch (error) {
+      setWebdavStatus(error instanceof Error ? error.message : "WebDAV 恢复失败");
+    }
   }
 
   async function checkForUpdates() {
@@ -1894,6 +1951,66 @@ function SettingsView({
           </button>
           <input ref={fileRef} hidden type="file" accept="application/json" onChange={handleImport} />
         </div>
+        <div className="button-row webdav-action-row">
+          <button className="secondary-button" onClick={backupToWebdav}>
+            <Upload size={18} />
+            备份到 WebDAV
+          </button>
+          <button className="secondary-button" onClick={restoreFromWebdav}>
+            <Download size={18} />
+            从 WebDAV 恢复
+          </button>
+        </div>
+        <button
+          type="button"
+          className={`settings-action-button webdav-config-button ${isWebdavSettingsOpen ? "open" : ""}`}
+          onClick={() => setIsWebdavSettingsOpen((current) => !current)}
+        >
+          <Settings size={18} />
+          <span>WebDAV 设置</span>
+          <em>{`${webdavConfig.url.trim() ? "已配置" : "未配置"} · ${webdavConfig.autoBackup ? "自动备份" : "手动备份"}`}</em>
+        </button>
+        {isWebdavSettingsOpen && (
+          <div className="webdav-settings">
+            <label className="field webdav-field">
+              <span>WebDAV 地址</span>
+              <input
+                placeholder="https://example.com/dav/backups"
+                value={webdavConfig.url}
+                onChange={(event) => setWebdavConfig((current) => ({ ...current, url: event.target.value }))}
+              />
+            </label>
+            <div className="webdav-auth-grid">
+              <label className="field webdav-field">
+                <span>用户名</span>
+                <input
+                  autoComplete="username"
+                  value={webdavConfig.username}
+                  onChange={(event) => setWebdavConfig((current) => ({ ...current, username: event.target.value }))}
+                />
+              </label>
+              <label className="field webdav-field">
+                <span>密码</span>
+                <input
+                  type="password"
+                  autoComplete="current-password"
+                  value={webdavConfig.password}
+                  onChange={(event) => setWebdavConfig((current) => ({ ...current, password: event.target.value }))}
+                />
+              </label>
+            </div>
+            <label className="webdav-toggle">
+              <input
+                type="checkbox"
+                checked={webdavConfig.autoBackup}
+                onChange={(event) => setWebdavConfig((current) => ({ ...current, autoBackup: event.target.checked }))}
+              />
+              <span>每天首次打开自动备份</span>
+            </label>
+          </div>
+        )}
+        {webdavConfig.lastAutoBackupDate && <p className="setting-hint">上次自动备份：{webdavConfig.lastAutoBackupDate}</p>}
+        {webdavStatus && <p className="setting-hint">{webdavStatus}</p>}
       </div>
       <div className="panel">
         <div className="section-title">
