@@ -1639,22 +1639,41 @@ h1 {
 
 .asset-add-form {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) 128px 72px;
+  gap: 8px;
   margin-bottom: 14px;
+  border: 1px solid #e6ded1;
+  border-radius: 8px;
+  background: #fffaf2;
+  padding: 10px;
 }
 
 .asset-add-form input,
-.asset-add-form select,
-.asset-kind-select,
 .transfer-rule-form input,
 .transfer-rule-form select {
   min-width: 0;
   border: 1px solid #e6ded1;
   border-radius: 8px;
-  background: #fff;
+  background: #fffaf2;
   padding: 0 12px;
   color: #27322f;
+}
+
+.asset-add-form input {
+  min-height: 42px;
+  font-weight: 800;
+}
+
+.asset-add-form input::placeholder {
+  color: #8f9792;
+}
+
+.asset-add-form input:focus,
+.transfer-rule-form input:focus,
+.transfer-rule-form select:focus {
+  border-color: #2f6f5e;
+  outline: 0;
+  box-shadow: 0 0 0 2px rgba(47, 111, 94, 0.12);
 }
 
 .asset-add-form button,
@@ -1666,6 +1685,36 @@ h1 {
   color: #fff;
   padding: 0 12px;
   font-weight: 800;
+}
+
+.account-kind-toggle {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  min-height: 42px;
+  border: 1px solid #e6ded1;
+  border-radius: 8px;
+  background: #fffaf2;
+  padding: 4px;
+}
+
+.account-kind-toggle button {
+  min-height: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #4d5753;
+  padding: 0 8px;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.account-kind-toggle button.selected {
+  background: #2f6f5e;
+  color: #fff;
+}
+
+.account-kind-toggle.disabled {
+  opacity: 0.54;
 }
 
 .recurring-rule-form {
@@ -1956,12 +2005,6 @@ h1 {
 .asset-actions {
   display: grid;
   gap: 8px;
-}
-
-.asset-kind-select {
-  min-height: 34px;
-  padding: 0 8px;
-  font-weight: 800;
 }
 
 .asset-delete {

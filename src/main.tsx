@@ -2081,10 +2081,7 @@ function AccountSettingsPanel({
       <div className="popup-title">账户设置</div>
       <form className="asset-add-form" onSubmit={addAccount}>
         <input placeholder="新增资产账户" value={newAccount} onChange={(event) => setNewAccount(event.target.value)} />
-        <select value={newAccountKind} onChange={(event) => setNewAccountKind(event.target.value as AccountKind)}>
-          <option value="cash">{accountKindLabel.cash}</option>
-          <option value="investment">{accountKindLabel.investment}</option>
-        </select>
+        <AccountKindToggle value={newAccountKind} onChange={setNewAccountKind} />
         <button type="submit">添加</button>
       </form>
       <div className="asset-list">
@@ -2101,15 +2098,11 @@ function AccountSettingsPanel({
                 </span>
               </div>
               <div className="asset-actions">
-                <select
-                  className="asset-kind-select"
+                <AccountKindToggle
                   value={accountKindOf(account)}
                   disabled={!account.id}
-                  onChange={(event) => account.id && db.accounts.update(account.id, { kind: event.target.value as AccountKind })}
-                >
-                  <option value="cash">{accountKindLabel.cash}</option>
-                  <option value="investment">{accountKindLabel.investment}</option>
-                </select>
+                  onChange={(kind) => account.id && db.accounts.update(account.id, { kind })}
+                />
                 <button type="button" className="asset-delete" disabled={dependencyCount > 0} onClick={() => deleteAccount(account.id, dependencyCount)}>
                   删除
                 </button>
@@ -2118,6 +2111,26 @@ function AccountSettingsPanel({
           );
         })}
       </div>
+    </div>
+  );
+}
+
+function AccountKindToggle({
+  value,
+  onChange,
+  disabled = false,
+}: {
+  value: AccountKind;
+  onChange: (value: AccountKind) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className={`account-kind-toggle ${disabled ? "disabled" : ""}`} aria-label="账户类型">
+      {(["cash", "investment"] as AccountKind[]).map((kind) => (
+        <button type="button" key={kind} className={value === kind ? "selected" : ""} disabled={disabled} onClick={() => onChange(kind)}>
+          {accountKindLabel[kind]}
+        </button>
+      ))}
     </div>
   );
 }
