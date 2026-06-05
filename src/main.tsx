@@ -255,6 +255,18 @@ function App() {
     swiperRef.current?.updateAutoHeight(0);
   }, [view, isDataReady, homeItems.length, homeDetailItems.length, statsItems.length, accounts.length, categories.length, transferRules.length]);
 
+  useEffect(() => {
+    function updateLayout() {
+      window.requestAnimationFrame(() => {
+        swiperRef.current?.update();
+        swiperRef.current?.updateAutoHeight(180);
+      });
+    }
+
+    window.addEventListener("localMoneyLayoutChange", updateLayout);
+    return () => window.removeEventListener("localMoneyLayoutChange", updateLayout);
+  }, []);
+
   return (
     <main className="app-shell">
       <header className={`topbar ${view === "stats" ? "stats-topbar" : ""}`}>
@@ -1783,7 +1795,20 @@ function buildCategoryStats(items: Transaction[], categories: ReturnType<typeof 
 }
 
 function StatsCategorySection({ title, total, data }: { title: string; total: number; data: CategoryStat[] }) {
+  const defaultVisibleCount = 6;
+  const [isExpanded, setIsExpanded] = useState(false);
   const chartData = data.length ? data : [{ name: "暂无", value: 1, percent: 0, color: "#f0f1f4", icon: "wallet" }];
+  const dataSignature = data.map((item) => `${item.name}:${item.value}`).join("|");
+  const hasMore = data.length > defaultVisibleCount;
+  const visibleData = isExpanded || !hasMore ? data : data.slice(0, defaultVisibleCount);
+
+  useEffect(() => {
+    setIsExpanded(false);
+  }, [title, dataSignature]);
+
+  useEffect(() => {
+    window.requestAnimationFrame(() => window.dispatchEvent(new Event("localMoneyLayoutChange")));
+  }, [isExpanded]);
 
   return (
     <section className="panel stats-category-panel">
@@ -1810,7 +1835,7 @@ function StatsCategorySection({ title, total, data }: { title: string; total: nu
             </div>
           </div>
           <div className="stats-rank-list">
-            {data.map((item) => (
+            {visibleData.map((item) => (
               <div className="stats-rank-row" key={item.name}>
                 <div className="stats-rank-icon" style={{ "--swatch": item.color } as React.CSSProperties}>
                   <CategoryIcon icon={item.icon} />
@@ -1828,6 +1853,15 @@ function StatsCategorySection({ title, total, data }: { title: string; total: nu
               </div>
             ))}
           </div>
+          {hasMore && (
+            <button
+              type="button"
+              className="stats-more-button"
+              onClick={() => setIsExpanded((current) => !current)}
+            >
+              {isExpanded ? "收起" : `查看更多（${data.length - defaultVisibleCount}）`}
+            </button>
+          )}
         </>
       )}
     </section>
@@ -1860,6 +1894,10 @@ function SettingsView({
   useEffect(() => {
     saveWebdavConfig(webdavConfig);
   }, [webdavConfig]);
+
+  useEffect(() => {
+    window.requestAnimationFrame(() => window.dispatchEvent(new Event("localMoneyLayoutChange")));
+  }, [isWebdavSettingsOpen, webdavStatus, webdavConfig.lastAutoBackupDate]);
 
   async function downloadBackup() {
     const payload = await exportBackup();

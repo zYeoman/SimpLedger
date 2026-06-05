@@ -1240,6 +1240,14 @@ h1 {
   font-weight: 800;
 }
 
+.stats-more-button {
+  min-height: 40px;
+  border-radius: 8px;
+  background: #eef0e7;
+  color: #27322f;
+  font-weight: 900;
+}
+
 .rank-list {
   display: grid;
   gap: 10px;
