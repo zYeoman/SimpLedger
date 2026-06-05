@@ -241,6 +241,11 @@ h1 {
   padding-inline: 16px;
 }
 
+.detail-panel .today-section-title {
+  align-items: stretch;
+  margin-bottom: 16px;
+}
+
 .detail-panel .virtual-month-title {
   padding-inline: 16px;
 }
@@ -260,6 +265,32 @@ h1 {
 
 .section-title h2 {
   font-size: 18px;
+}
+
+.today-almanac {
+  display: grid;
+  width: 100%;
+  gap: 8px;
+}
+
+.today-almanac > div:first-child {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.today-almanac h2 {
+  color: #27322f;
+  font-size: 22px;
+  line-height: 1.15;
+}
+
+.today-almanac > div:first-child span,
+.today-almanac p {
+  color: #77807b;
+  font-size: 13px;
+  font-weight: 800;
 }
 
 .entry-form,

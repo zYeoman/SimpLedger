@@ -643,13 +643,102 @@ function HomeView({
         <Metric label="本月收入" value={currency.format(income)} tone="income" />
       </section>
       <section className="panel detail-panel">
-        <div className="section-title">
-          <h2>明细</h2>
+        <div className="section-title today-section-title">
+          <TodayAlmanacHeader />
         </div>
         {detailItems.length === 0 ? <EmptyState /> : <VirtualTransactionList items={detailItems} categories={categories} goEdit={goEdit} />}
       </section>
     </>
   );
+}
+
+type TodayAlmanac = {
+  solar: string;
+  weekday: string;
+  lunar: string;
+  festival: string;
+  nextHoliday: string;
+};
+
+function TodayAlmanacHeader() {
+  const [info, setInfo] = useState<TodayAlmanac>(() => buildFallbackTodayAlmanac());
+
+  useEffect(() => {
+    let isActive = true;
+
+    async function loadAlmanac() {
+      try {
+        const { LegalHoliday, SolarDay } = await import("tyme4ts");
+        const now = new Date();
+        const solarDay = SolarDay.fromYmd(now.getFullYear(), now.getMonth() + 1, now.getDate());
+        const lunarDay = solarDay.getLunarDay();
+        const termDay = solarDay.getTermDay();
+        const festival = [
+          solarDay.getFestival(),
+          lunarDay.getFestival(),
+          termDay.getDayIndex() === 0 ? termDay.getSolarTerm() : null,
+        ]
+          .filter(Boolean)
+          .map(String)
+          .join("、");
+        if (!isActive) return;
+        setInfo({
+          solar: formatTodaySolar(now),
+          weekday: new Intl.DateTimeFormat("zh-CN", { weekday: "long" }).format(now),
+          lunar: lunarDay.toString(),
+          festival,
+          nextHoliday: findNextLegalHolidayLabel(now, LegalHoliday),
+        });
+      } catch {
+        if (isActive) setInfo(buildFallbackTodayAlmanac());
+      }
+    }
+
+    loadAlmanac();
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  return (
+    <div className="today-almanac">
+      <div>
+        <h2>{info.solar}</h2>
+        <span>{info.weekday}</span>
+      </div>
+      <p>{[info.lunar, info.festival, info.nextHoliday].filter(Boolean).join(" · ")}</p>
+    </div>
+  );
+}
+
+function buildFallbackTodayAlmanac(): TodayAlmanac {
+  const now = new Date();
+  return {
+    solar: formatTodaySolar(now),
+    weekday: new Intl.DateTimeFormat("zh-CN", { weekday: "long" }).format(now),
+    lunar: "正在加载农历",
+    festival: "",
+    nextHoliday: "",
+  };
+}
+
+function findNextLegalHolidayLabel(now: Date, LegalHoliday: typeof import("tyme4ts").LegalHoliday) {
+  for (let offset = 1; offset <= 370; offset += 1) {
+    const candidate = new Date(now);
+    candidate.setDate(now.getDate() + offset);
+    const holiday = LegalHoliday.fromYmd(candidate.getFullYear(), candidate.getMonth() + 1, candidate.getDate());
+    if (holiday && !holiday.isWork()) {
+      return `距${holiday.getName()} ${offset}天`;
+    }
+  }
+  return "";
+}
+
+function formatTodaySolar(date: Date) {
+  return new Intl.DateTimeFormat("zh-CN", {
+    month: "long",
+    day: "numeric",
+  }).format(date);
 }
 
 type VirtualTransactionRow =
