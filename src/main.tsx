@@ -301,7 +301,7 @@ function App() {
           className="view-swiper"
           autoHeight
           initialSlide={viewOrder.indexOf(view)}
-          noSwipingSelector="input, textarea, select, button, .account-filter, .adm-popup, .adm-picker, .adm-date-picker"
+          noSwipingSelector=".adm-popup, .adm-picker, .adm-date-picker"
           onSwiper={(swiper) => {
             swiperRef.current = swiper;
           }}
