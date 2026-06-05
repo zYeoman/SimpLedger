@@ -409,6 +409,7 @@ function App() {
           mode={statsMode}
           month={statsMonth}
           year={statsYear}
+          goEdit={openEntryPage}
         />
       );
     }
@@ -1642,6 +1643,7 @@ function StatsView({
   mode,
   month,
   year,
+  goEdit,
 }: {
   items: Transaction[];
   categories: ReturnType<typeof useCategories>;
@@ -1649,6 +1651,7 @@ function StatsView({
   mode: "month" | "year";
   month: string;
   year: string;
+  goEdit: (transaction: Transaction) => void;
 }) {
   const accountKindByName = new Map(accounts.map((account) => [account.name, accountKindOf(account)]));
   const nonTransferItems = items.filter((item) => item.type !== "transfer");
@@ -1694,8 +1697,22 @@ function StatsView({
           </div>
         </div>
       )}
-      <StatsCategorySection title="支出分类" total={expenseTotal} data={expenseData} />
-      <StatsCategorySection title="收入分类" total={incomeTotal} data={incomeData} />
+      <StatsCategorySection
+        title="支出分类"
+        total={expenseTotal}
+        data={expenseData}
+        items={ordinaryItems.filter((item) => item.type === "expense")}
+        categories={categories}
+        goEdit={goEdit}
+      />
+      <StatsCategorySection
+        title="收入分类"
+        total={incomeTotal}
+        data={incomeData}
+        items={ordinaryItems.filter((item) => item.type === "income")}
+        categories={categories}
+        goEdit={goEdit}
+      />
     </section>
   );
 }
@@ -1794,13 +1811,33 @@ function buildCategoryStats(items: Transaction[], categories: ReturnType<typeof 
     .sort((a, b) => b.value - a.value);
 }
 
-function StatsCategorySection({ title, total, data }: { title: string; total: number; data: CategoryStat[] }) {
+function StatsCategorySection({
+  title,
+  total,
+  data,
+  items,
+  categories,
+  goEdit,
+}: {
+  title: string;
+  total: number;
+  data: CategoryStat[];
+  items: Transaction[];
+  categories: ReturnType<typeof useCategories>;
+  goEdit: (transaction: Transaction) => void;
+}) {
   const defaultVisibleCount = 6;
   const [isExpanded, setIsExpanded] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<CategoryStat | null>(null);
+  const [isDetailClosing, setIsDetailClosing] = useState(false);
+  const closeSelectedCategory = useHistoryBackedPopup(Boolean(selectedCategory), (visible) => {
+    if (!visible) animateSelectedCategoryClose();
+  }, `localMoneyStatsCategoryDetail${title}`);
   const chartData = data.length ? data : [{ name: "暂无", value: 1, percent: 0, color: "#f0f1f4", icon: "wallet" }];
   const dataSignature = data.map((item) => `${item.name}:${item.value}`).join("|");
   const hasMore = data.length > defaultVisibleCount;
   const visibleData = isExpanded || !hasMore ? data : data.slice(0, defaultVisibleCount);
+  const detailItems = selectedCategory ? items.filter((item) => item.category === selectedCategory.name) : [];
 
   useEffect(() => {
     setIsExpanded(false);
@@ -1809,6 +1846,19 @@ function StatsCategorySection({ title, total, data }: { title: string; total: nu
   useEffect(() => {
     window.requestAnimationFrame(() => window.dispatchEvent(new Event("localMoneyLayoutChange")));
   }, [isExpanded]);
+
+  function openSelectedCategory(item: CategoryStat) {
+    setIsDetailClosing(false);
+    setSelectedCategory(item);
+  }
+
+  function animateSelectedCategoryClose() {
+    setIsDetailClosing(true);
+    window.setTimeout(() => {
+      setSelectedCategory(null);
+      setIsDetailClosing(false);
+    }, 220);
+  }
 
   return (
     <section className="panel stats-category-panel">
@@ -1836,7 +1886,7 @@ function StatsCategorySection({ title, total, data }: { title: string; total: nu
           </div>
           <div className="stats-rank-list">
             {visibleData.map((item) => (
-              <div className="stats-rank-row" key={item.name}>
+              <button type="button" className="stats-rank-row clickable" key={item.name} onClick={() => openSelectedCategory(item)}>
                 <div className="stats-rank-icon" style={{ "--swatch": item.color } as React.CSSProperties}>
                   <CategoryIcon icon={item.icon} />
                 </div>
@@ -1850,7 +1900,7 @@ function StatsCategorySection({ title, total, data }: { title: string; total: nu
                   </div>
                 </div>
                 <em>{item.percent.toFixed(2)}%</em>
-              </div>
+              </button>
             ))}
           </div>
           {hasMore && (
@@ -1862,6 +1912,22 @@ function StatsCategorySection({ title, total, data }: { title: string; total: nu
               {isExpanded ? "收起" : `查看更多（${data.length - defaultVisibleCount}）`}
             </button>
           )}
+          {selectedCategory &&
+            createPortal(
+              <section className={`stats-detail-page ${isDetailClosing ? "leaving" : ""}`} aria-labelledby="stats-detail-title">
+                <div className="stats-detail-inner">
+                  <div className="sheet-title">
+                    <div>
+                      <h2 id="stats-detail-title">{selectedCategory.name}</h2>
+                      <p>{`${formatAmountPlain(selectedCategory.value)} · ${selectedCategory.percent.toFixed(2)}% · ${detailItems.length} 笔`}</p>
+                    </div>
+                    <button onClick={closeSelectedCategory}>关闭</button>
+                  </div>
+                  <TransactionList items={detailItems} categories={categories} goEdit={goEdit} />
+                </div>
+              </section>,
+              document.body,
+            )}
         </>
       )}
     </section>

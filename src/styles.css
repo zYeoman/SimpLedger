@@ -1196,6 +1196,14 @@ h1 {
   grid-template-columns: 46px minmax(0, 1fr) auto;
   gap: 12px;
   align-items: center;
+  width: 100%;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+}
+
+.stats-rank-row.clickable:active {
+  opacity: 0.72;
 }
 
 .stats-rank-icon {
@@ -1246,6 +1254,35 @@ h1 {
   background: #eef0e7;
   color: #27322f;
   font-weight: 900;
+}
+
+.stats-detail-page {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  display: grid;
+  justify-items: center;
+  background: #f7f3ec;
+  animation: page-rise 220ms ease-out;
+}
+
+.stats-detail-page.leaving {
+  animation: page-sink 220ms ease-in forwards;
+}
+
+.stats-detail-inner {
+  width: min(100%, 520px);
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow-y: auto;
+  padding: calc(10px + env(safe-area-inset-top)) 16px calc(18px + env(safe-area-inset-bottom));
+}
+
+.stats-detail-inner .sheet-title p {
+  margin-top: 4px;
+  color: #77807b;
+  font-size: 13px;
+  font-weight: 800;
 }
 
 .rank-list {
