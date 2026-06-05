@@ -1089,14 +1089,14 @@ function EntryForm({
           <button type="button" className="operator-key" onClick={() => pressAmountKey("backspace")} aria-label="退格">
             ⌫
           </button>
-          <button type="button" onClick={() => pressAmountKey(".")}>
-            .
+          <button type="button" className="clear-key" onClick={() => pressAmountKey("clear")}>
+            清空
           </button>
           <button type="button" onClick={() => pressAmountKey("0")}>
             0
           </button>
-          <button type="button" className="clear-key" onClick={() => pressAmountKey("clear")}>
-            清空
+          <button type="button" onClick={() => pressAmountKey(".")}>
+            .
           </button>
           {hasAmountExpression ? (
             <button
