@@ -1198,8 +1198,58 @@ h1 {
   gap: 16px;
 }
 
+.stats-flow-panel {
+  display: grid;
+  gap: 12px;
+}
+
 .stats-section-title {
   margin-bottom: 0;
+}
+
+.stats-flow-chart {
+  position: relative;
+  min-width: 0;
+}
+
+.stats-flow-chart .recharts-wrapper,
+.stats-flow-chart .recharts-surface {
+  overflow: visible;
+}
+
+.stats-flow-chart .recharts-tooltip-wrapper {
+  pointer-events: none;
+}
+
+.stats-flow-legend {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 2px;
+}
+
+.stats-flow-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #6b736f;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.stats-flow-legend span::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.stats-flow-legend .income::before {
+  background: #2f7d62;
+}
+
+.stats-flow-legend .expense::before {
+  background: #c94f3f;
 }
 
 .stats-chart-layout {

@@ -87,7 +87,7 @@ import {
   Wrench,
   Zap,
 } from "lucide-react";
-import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
+import { Bar, BarChart as RechartsBarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import {
   accountKindLabel,
   accountKindOf,
@@ -303,7 +303,7 @@ function App() {
           className="view-swiper"
           autoHeight
           initialSlide={viewOrder.indexOf(view)}
-          noSwipingSelector=".adm-popup, .adm-picker, .adm-date-picker"
+          noSwipingSelector=".adm-popup, .adm-picker, .adm-date-picker, .stats-flow-chart"
           onSwiper={(swiper) => {
             swiperRef.current = swiper;
           }}
@@ -406,6 +406,7 @@ function App() {
       return (
         <StatsView
           items={statsItems}
+          allItems={transactions}
           categories={categories}
           accounts={accounts}
           mode={statsMode}
@@ -1438,6 +1439,11 @@ function formatAmountPlain(value: number) {
   }).format(value);
 }
 
+function formatCompactAmount(value: number) {
+  if (Math.abs(value) >= 10000) return `${Math.round(value / 1000) / 10}万`;
+  return formatAmountPlain(value);
+}
+
 const categoryIconOptions = [
   { value: "eat", label: "吃饭" },
   { value: "hamburger", label: "汉堡" },
@@ -1727,6 +1733,7 @@ function AssetsView({ items, accounts }: { items: Transaction[]; accounts: Accou
 
 function StatsView({
   items,
+  allItems,
   categories,
   accounts,
   mode,
@@ -1735,6 +1742,7 @@ function StatsView({
   goEdit,
 }: {
   items: Transaction[];
+  allItems: Transaction[];
   categories: ReturnType<typeof useCategories>;
   accounts: Account[];
   mode: StatsMode;
@@ -1743,6 +1751,9 @@ function StatsView({
   goEdit: (transaction: Transaction) => void;
 }) {
   const accountKindByName = new Map(accounts.map((account) => [account.name, accountKindOf(account)]));
+  const allNonTransferItems = allItems.filter((item) => item.type !== "transfer");
+  const allOrdinaryItems = allNonTransferItems.filter((item) => (accountKindByName.get(item.account || defaultAccounts[0]) ?? inferAccountKind(item.account || defaultAccounts[0])) !== "investment");
+  const allInvestmentItems = allNonTransferItems.filter((item) => (accountKindByName.get(item.account || defaultAccounts[0]) ?? inferAccountKind(item.account || defaultAccounts[0])) === "investment");
   const nonTransferItems = items.filter((item) => item.type !== "transfer");
   const ordinaryItems = nonTransferItems.filter((item) => (accountKindByName.get(item.account || defaultAccounts[0]) ?? inferAccountKind(item.account || defaultAccounts[0])) !== "investment");
   const investmentItems = nonTransferItems.filter((item) => (accountKindByName.get(item.account || defaultAccounts[0]) ?? inferAccountKind(item.account || defaultAccounts[0])) === "investment");
@@ -1753,6 +1764,8 @@ function StatsView({
   const investmentProfit = investmentIncome - investmentExpense;
   const expenseData = buildCategoryStats(ordinaryItems, categories, "expense");
   const incomeData = buildCategoryStats(ordinaryItems, categories, "income");
+  const flowData = buildStatsFlowData(mode === "year" ? allOrdinaryItems : ordinaryItems, mode, month, year);
+  const investmentProfitData = buildInvestmentProfitData(mode === "year" ? allInvestmentItems : investmentItems, mode, month, year);
 
   return (
     <section className="stats-page">
@@ -1802,6 +1815,8 @@ function StatsView({
         categories={categories}
         goEdit={goEdit}
       />
+      {mode !== "month" && <StatsFlowBarSection data={flowData} />}
+      {mode !== "month" && investmentItems.length > 0 && <InvestmentProfitBarSection data={investmentProfitData} />}
     </section>
   );
 }
@@ -1877,6 +1892,16 @@ function nextStatsMode(mode: StatsMode): StatsMode {
   return "month";
 }
 
+function getRecentYearMonths(endMonth: string) {
+  const [year, month] = endMonth.split("-").map(Number);
+  const end = new Date(year, month - 1, 1);
+  return Array.from({ length: 12 }, (_, index) => {
+    const date = new Date(end);
+    date.setMonth(end.getMonth() - 11 + index);
+    return monthKey(date);
+  });
+}
+
 function formatStatsMonthLabel(value: string) {
   const [year, month] = value.split("-");
   return `${year.slice(-2)}/${month}`;
@@ -1897,6 +1922,135 @@ type CategoryStat = {
 };
 
 type StatsDetailSort = "dateDesc" | "amountDesc";
+
+type StatsFlowDatum = {
+  key: string;
+  label: string;
+  income: number;
+  expense: number;
+};
+
+type InvestmentProfitDatum = {
+  key: string;
+  label: string;
+  profit: number;
+};
+
+function buildStatsFlowData(items: Transaction[], mode: StatsMode, month: string, year: string): StatsFlowDatum[] {
+  if (mode === "month") {
+    const range = getMonthRange(month);
+    const endDay = Number(range.end.slice(-2));
+    return Array.from({ length: endDay }, (_, index) => {
+      const day = String(index + 1).padStart(2, "0");
+      const date = `${month}-${day}`;
+      return buildStatsFlowDatum(date, `${index + 1}`, items.filter((item) => item.date === date));
+    });
+  }
+  if (mode === "year") {
+    return getRecentYearMonths(month).map((key) => buildStatsFlowDatum(key, formatStatsMonthLabel(key), items.filter((item) => item.date.startsWith(`${key}-`))));
+  }
+
+  const years = [...new Set(items.map((item) => item.date.slice(0, 4)))].sort();
+  return years.map((itemYear) => buildStatsFlowDatum(itemYear, `${itemYear}`, items.filter((item) => item.date.startsWith(`${itemYear}-`))));
+}
+
+function buildStatsFlowDatum(key: string, label: string, items: Transaction[]): StatsFlowDatum {
+  return {
+    key,
+    label,
+    income: Math.round(sumByType(items, "income") * 100) / 100,
+    expense: Math.round(sumByType(items, "expense") * 100) / 100,
+  };
+}
+
+function StatsFlowBarSection({ data }: { data: StatsFlowDatum[] }) {
+  const hasData = data.some((item) => item.income > 0 || item.expense > 0);
+
+  return (
+    <section className="panel stats-flow-panel">
+      <div className="section-title stats-section-title">
+        <h2>收支趋势</h2>
+      </div>
+      {!hasData ? (
+        <EmptyState />
+      ) : (
+        <div className="stats-flow-chart">
+          <ResponsiveContainer width="100%" height={220}>
+            <RechartsBarChart data={data} margin={{ top: 8, right: 4, left: -18, bottom: 0 }}>
+              <CartesianGrid stroke="#eee7dc" vertical={false} />
+              <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: "#77807b", fontSize: 11 }} interval="preserveStartEnd" />
+              <YAxis tickLine={false} axisLine={false} tick={{ fill: "#77807b", fontSize: 11 }} tickFormatter={formatCompactAmount} />
+              <Tooltip
+                trigger="hover"
+                formatter={(value: number) => currency.format(value)}
+                labelFormatter={(label) => `${label}`}
+              />
+              <Bar dataKey="income" name="收入" fill="#2f7d62" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="expense" name="支出" fill="#c94f3f" radius={[4, 4, 0, 0]} />
+            </RechartsBarChart>
+          </ResponsiveContainer>
+          <div className="stats-flow-legend" aria-hidden="true">
+            <span className="income">收入</span>
+            <span className="expense">支出</span>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function buildInvestmentProfitData(items: Transaction[], mode: StatsMode, month: string, year: string): InvestmentProfitDatum[] {
+  if (mode === "month") {
+    const range = getMonthRange(month);
+    const endDay = Number(range.end.slice(-2));
+    return Array.from({ length: endDay }, (_, index) => {
+      const day = String(index + 1).padStart(2, "0");
+      const date = `${month}-${day}`;
+      return buildInvestmentProfitDatum(date, `${index + 1}`, items.filter((item) => item.date === date));
+    });
+  }
+  if (mode === "year") {
+    return getRecentYearMonths(month).map((key) => buildInvestmentProfitDatum(key, formatStatsMonthLabel(key), items.filter((item) => item.date.startsWith(`${key}-`))));
+  }
+
+  const years = [...new Set(items.map((item) => item.date.slice(0, 4)))].sort();
+  return years.map((itemYear) => buildInvestmentProfitDatum(itemYear, `${itemYear}`, items.filter((item) => item.date.startsWith(`${itemYear}-`))));
+}
+
+function buildInvestmentProfitDatum(key: string, label: string, items: Transaction[]): InvestmentProfitDatum {
+  return {
+    key,
+    label,
+    profit: Math.round((sumByType(items, "income") - sumByType(items, "expense")) * 100) / 100,
+  };
+}
+
+function InvestmentProfitBarSection({ data }: { data: InvestmentProfitDatum[] }) {
+  const hasData = data.some((item) => item.profit !== 0);
+
+  return (
+    <section className="panel stats-flow-panel">
+      <div className="section-title stats-section-title">
+        <h2>理财盈亏</h2>
+      </div>
+      {!hasData ? (
+        <EmptyState />
+      ) : (
+        <div className="stats-flow-chart">
+          <ResponsiveContainer width="100%" height={210}>
+            <RechartsBarChart data={data} margin={{ top: 8, right: 4, left: -18, bottom: 0 }}>
+              <CartesianGrid stroke="#eee7dc" vertical={false} />
+              <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: "#77807b", fontSize: 11 }} interval="preserveStartEnd" />
+              <YAxis tickLine={false} axisLine={false} tick={{ fill: "#77807b", fontSize: 11 }} tickFormatter={formatCompactAmount} />
+              <Tooltip trigger="hover" formatter={(value: number) => currency.format(value)} labelFormatter={(label) => `${label}`} />
+              <Bar dataKey="profit" name="盈亏" fill="#4776b4" radius={[4, 4, 0, 0]} />
+            </RechartsBarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+    </section>
+  );
+}
 
 function buildCategoryStats(items: Transaction[], categories: ReturnType<typeof useCategories>, type: TransactionType): CategoryStat[] {
   const typedItems = items.filter((item) => item.type === type);
