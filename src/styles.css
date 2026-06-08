@@ -414,6 +414,14 @@ h1 {
   font-size: 20px;
 }
 
+.entry-close-button {
+  display: grid;
+  place-items: center;
+  padding: 4px;
+  background: transparent;
+  color: #27322f;
+}
+
 @keyframes page-rise {
   from {
     transform: translateY(100%);

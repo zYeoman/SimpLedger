@@ -85,6 +85,7 @@ import {
   Wifi,
   Wine,
   Wrench,
+  X,
   Zap,
 } from "lucide-react";
 import { Bar, BarChart as RechartsBarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
@@ -347,7 +348,9 @@ function App() {
           <div className="entry-page-inner">
             <div className="sheet-title">
               <h2 id="entry-title">{editingTransaction ? "修改一笔" : "记一笔"}</h2>
-              <button onClick={closeEntryPage}>关闭</button>
+              <button className="entry-close-button" aria-label="关闭" onClick={closeEntryPage}>
+                <X size={22} />
+              </button>
             </div>
             {isDataReady ? (
               <EntryForm categories={categories} accounts={accounts} transaction={editingTransaction} onDone={closeEntryPage} />
