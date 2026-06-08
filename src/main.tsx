@@ -124,6 +124,9 @@ type StatsMode = "month" | "year" | "all";
 const activeHistoryPopupTokens = new Set<symbol>();
 const viewOrder: View[] = ["home", "assets", "stats", "settings"];
 const homeAccountFiltersStorageKey = "localMoneyHomeAccountFilters";
+const themeColorStorageKey = "localMoneyThemeColor";
+const defaultThemeColor = "#2f6f5e";
+const themeColorOptions = ["#2f6f5e", "#4776b4", "#8b68b8", "#c24b5a", "#c28a2c", "#3a8d8f"];
 
 const typeLabel: Record<TransactionType, string> = {
   expense: "支出",
@@ -142,6 +145,18 @@ function readHomeAccountFilters() {
   }
 }
 
+function readThemeColor() {
+  if (typeof window === "undefined") return defaultThemeColor;
+  return window.localStorage.getItem(themeColorStorageKey) || defaultThemeColor;
+}
+
+function applyThemeColor(color: string) {
+  document.documentElement.style.setProperty("--theme-primary", color);
+  document.documentElement.style.setProperty("--adm-color-primary", color);
+}
+
+applyThemeColor(readThemeColor());
+
 function App() {
   const [view, setView] = useState<View>("home");
   const viewRef = useRef<View>("home");
@@ -156,6 +171,7 @@ function App() {
   const [statsMonth, setStatsMonth] = useState(monthKey());
   const [statsYear, setStatsYear] = useState(String(new Date().getFullYear()));
   const [homeAccountFilters, setHomeAccountFilters] = useState<string[]>(readHomeAccountFilters);
+  const [themeColor, setThemeColor] = useState(readThemeColor);
   const [isSeedReady, setIsSeedReady] = useState(false);
   const categoryRows = useLiveQuery(() => db.categories.orderBy("type").toArray(), []);
   const accountRows = useLiveQuery(() => db.accounts.orderBy("createdAt").toArray(), []);
@@ -191,6 +207,11 @@ function App() {
   useEffect(() => {
     window.localStorage.setItem(homeAccountFiltersStorageKey, JSON.stringify(homeAccountFilters));
   }, [homeAccountFilters]);
+
+  useEffect(() => {
+    applyThemeColor(themeColor);
+    window.localStorage.setItem(themeColorStorageKey, themeColor);
+  }, [themeColor]);
 
   useEffect(() => {
     if (!isDataReady || autoWebdavBackupStartedRef.current) return;
@@ -417,7 +438,7 @@ function App() {
         />
       );
     }
-    return <SettingsView categories={categories} transactions={transactions} accounts={accounts} transferRules={transferRules} />;
+    return <SettingsView categories={categories} transactions={transactions} accounts={accounts} transferRules={transferRules} themeColor={themeColor} setThemeColor={setThemeColor} />;
   }
 
   function closeEntryPage() {
@@ -1717,7 +1738,7 @@ function AssetsView({ items, accounts }: { items: Transaction[]; accounts: Accou
               <article
                 className="asset-row"
                 key={row.account}
-                style={{ "--swatch": row.kind === "investment" ? "#4776b4" : "#2f6f5e" } as React.CSSProperties}
+                style={{ "--swatch": row.kind === "investment" ? "#4776b4" : "var(--theme-primary)" } as React.CSSProperties}
               >
                 <div className="asset-row-icon">{row.kind === "investment" ? <TrendingUp /> : <Wallet />}</div>
                 <div className="asset-row-main">
@@ -2271,11 +2292,15 @@ function SettingsView({
   transactions,
   accounts,
   transferRules,
+  themeColor,
+  setThemeColor,
 }: {
   categories: ReturnType<typeof useCategories>;
   transactions: Transaction[];
   accounts: Account[];
   transferRules: TransferRule[];
+  themeColor: string;
+  setThemeColor: (color: string) => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [updateStatus, setUpdateStatus] = useState("");
@@ -2370,6 +2395,21 @@ function SettingsView({
         <button className="secondary-button update-button" onClick={checkForUpdates}>
           检查更新
         </button>
+        <div className="theme-color-settings">
+          <span>主题颜色</span>
+          <div>
+            {themeColorOptions.map((color) => (
+              <button
+                type="button"
+                key={color}
+                className={themeColor === color ? "selected" : ""}
+                aria-label={`主题颜色 ${color}`}
+                style={{ "--swatch": color } as React.CSSProperties}
+                onClick={() => setThemeColor(color)}
+              />
+            ))}
+          </div>
+        </div>
         {updateStatus && <p className="setting-hint">{updateStatus}</p>}
       </div>
       <div className="panel">
