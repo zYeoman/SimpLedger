@@ -477,6 +477,43 @@ function transactionBelongsToAccount(item: Transaction, account: string) {
   return (item.account || defaultAccounts[0]) === account || (item.type === "transfer" && item.toAccount === account);
 }
 
+type AccountBalanceRow = {
+  account: string;
+  income: number;
+  expense: number;
+  transferIn: number;
+  transferOut: number;
+  balance: number;
+  count: number;
+  id?: number;
+  kind: AccountKind;
+};
+
+function buildAccountBalanceRows(items: Transaction[], accounts: Account[]): AccountBalanceRow[] {
+  const accountRecords: Account[] = accounts.length
+    ? accounts
+    : defaultAccounts.map((name) => ({ name, kind: inferAccountKind(name), createdAt: "" }));
+  return accountRecords.map((accountRecord) => {
+    const account = accountRecord.name;
+    const accountItems = items.filter((item) => transactionBelongsToAccount(item, account));
+    const income = sumByType(accountItems.filter((item) => item.type !== "transfer"), "income");
+    const expense = sumByType(accountItems.filter((item) => item.type !== "transfer"), "expense");
+    const transferIn = accountItems.filter((item) => item.type === "transfer" && item.toAccount === account).reduce((sum, item) => sum + item.amount, 0);
+    const transferOut = accountItems.filter((item) => item.type === "transfer" && (item.account || defaultAccounts[0]) === account).reduce((sum, item) => sum + item.amount, 0);
+    return {
+      account,
+      income,
+      expense,
+      transferIn,
+      transferOut,
+      balance: income + transferIn - expense - transferOut,
+      count: accountItems.length,
+      id: accountRecord.id,
+      kind: accountKindOf(accountRecord),
+    };
+  });
+}
+
 function defaultAccountForCategory(categories: Pick<Category, "name" | "defaultAccount">[], categoryName: string, accountNames: string[]) {
   const defaultAccount = categories.find((item) => item.name === categoryName)?.defaultAccount;
   return defaultAccount && accountNames.includes(defaultAccount) ? defaultAccount : undefined;
@@ -1490,6 +1527,57 @@ function fitStatsAmountStyle(value: number): React.CSSProperties {
   return { fontSize };
 }
 
+const dayMs = 24 * 60 * 60 * 1000;
+
+function parseLocalDate(value: string) {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function inclusiveDayCount(start: string, end: string) {
+  return Math.max(1, Math.floor((parseLocalDate(end).getTime() - parseLocalDate(start).getTime()) / dayMs) + 1);
+}
+
+function statsAverageDayCount(mode: StatsMode, month: string, year: string, items: Transaction[]) {
+  const today = todayInputValue();
+  if (mode === "month") {
+    const range = getMonthRange(month);
+    const end = month === monthKey() ? today : range.end;
+    return inclusiveDayCount(range.start, end);
+  }
+  if (mode === "year") {
+    const start = `${year}-01-01`;
+    const end = year === String(new Date().getFullYear()) ? today : `${year}-12-31`;
+    return inclusiveDayCount(start, end);
+  }
+  const dates = items.map((item) => item.date).sort();
+  if (!dates.length) return 1;
+  return inclusiveDayCount(dates[0], dates[dates.length - 1]);
+}
+
+function formatAssetRunway(totalBalance: number, dailyExpense: number) {
+  if (totalBalance <= 0) return "0 天";
+  if (dailyExpense <= 0) return "∞";
+  const days = Math.floor(totalBalance / dailyExpense);
+  return days > 9999 ? ">9999 天" : `${days} 天`;
+}
+
+function buildAssetRunwayMetrics(items: Transaction[], accounts: Account[]) {
+  const accountKindByName = new Map(accounts.map((account) => [account.name, accountKindOf(account)]));
+  const ordinaryItems = items
+    .filter((item) => item.type !== "transfer")
+    .filter((item) => (accountKindByName.get(item.account || defaultAccounts[0]) ?? inferAccountKind(item.account || defaultAccounts[0])) !== "investment");
+  const averageDayCount = statsAverageDayCount("all", monthKey(), String(new Date().getFullYear()), ordinaryItems);
+  const dailyExpense = sumByType(ordinaryItems, "expense") / averageDayCount;
+  const dailyIncome = sumByType(ordinaryItems, "income") / averageDayCount;
+  const totalBalance = buildAccountBalanceRows(items, accounts).reduce((sum, item) => sum + item.balance, 0);
+  return {
+    dailyExpense,
+    dailyIncome,
+    runway: formatAssetRunway(totalBalance, dailyExpense),
+  };
+}
+
 const categoryIconOptions = [
   { value: "eat", label: "吃饭" },
   { value: "hamburger", label: "汉堡" },
@@ -1686,32 +1774,12 @@ function softColor(hex: string) {
 }
 
 function AssetsView({ items, accounts }: { items: Transaction[]; accounts: Account[] }) {
-  const accountRecords: Account[] = accounts.length
-    ? accounts
-    : defaultAccounts.map((name) => ({ name, kind: inferAccountKind(name), createdAt: "" }));
-  const rows = accountRecords.map((accountRecord) => {
-    const account = accountRecord.name;
-    const accountItems = items.filter((item) => transactionBelongsToAccount(item, account));
-    const income = sumByType(accountItems.filter((item) => item.type !== "transfer"), "income");
-    const expense = sumByType(accountItems.filter((item) => item.type !== "transfer"), "expense");
-    const transferIn = accountItems.filter((item) => item.type === "transfer" && item.toAccount === account).reduce((sum, item) => sum + item.amount, 0);
-    const transferOut = accountItems.filter((item) => item.type === "transfer" && (item.account || defaultAccounts[0]) === account).reduce((sum, item) => sum + item.amount, 0);
-    return {
-      account,
-      income,
-      expense,
-      transferIn,
-      transferOut,
-      balance: income + transferIn - expense - transferOut,
-      count: accountItems.length,
-      id: accountRecord.id,
-      kind: accountKindOf(accountRecord),
-    };
-  });
+  const rows = buildAccountBalanceRows(items, accounts);
   const total = rows.reduce((sum, item) => sum + item.balance, 0);
   const cashTotal = rows.filter((item) => item.kind === "cash").reduce((sum, item) => sum + item.balance, 0);
   const investmentTotal = rows.filter((item) => item.kind === "investment").reduce((sum, item) => sum + item.balance, 0);
   const totalAbsBalance = rows.reduce((sum, item) => sum + Math.abs(item.balance), 0);
+  const runway = buildAssetRunwayMetrics(items, accounts);
 
   return (
     <section className="settings-stack">
@@ -1719,6 +1787,22 @@ function AssetsView({ items, accounts }: { items: Transaction[]; accounts: Accou
         <div>
           <span>总资产</span>
           <strong>{currency.format(total)}</strong>
+        </div>
+      </div>
+      <div className="asset-runway-card">
+        <div className="asset-runway-grid">
+          <span>
+            <em>日均支出</em>
+            <strong className="expense" title={`${currency.format(runway.dailyExpense)} / 天`} style={fitStatsAmountStyle(runway.dailyExpense)}>{currency.format(runway.dailyExpense)}</strong>
+          </span>
+          <span>
+            <em>日均收入</em>
+            <strong title={`${currency.format(runway.dailyIncome)} / 天`} style={fitStatsAmountStyle(runway.dailyIncome)}>{currency.format(runway.dailyIncome)}</strong>
+          </span>
+          <span>
+            <em>0 收入能活</em>
+            <strong>{runway.runway}</strong>
+          </span>
         </div>
       </div>
       <div className="panel">

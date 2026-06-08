@@ -1175,6 +1175,57 @@ h1 {
   margin-top: -6px;
 }
 
+.asset-runway-card {
+  display: grid;
+  gap: 12px;
+  border: 1px solid #e6ded1;
+  border-radius: 8px;
+  background: #fffaf2;
+  padding: 14px;
+}
+
+.asset-runway-card > div:first-child {
+  display: grid;
+  gap: 6px;
+}
+
+.asset-runway-card > div:first-child span,
+.asset-runway-grid em {
+  color: #6b736f;
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.asset-runway-card > div:first-child strong {
+  color: #27322f;
+  font-size: 16px;
+}
+
+.asset-runway-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.asset-runway-grid span {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.asset-runway-grid strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #27322f;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.asset-runway-grid .expense {
+  color: #c94f3f;
+}
+
 .stats-summary div {
   border: 1px solid #e6ded1;
   border-radius: 8px;
