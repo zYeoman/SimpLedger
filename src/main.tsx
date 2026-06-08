@@ -1806,9 +1806,6 @@ function AssetsView({ items, accounts }: { items: Transaction[]; accounts: Accou
         </div>
       </div>
       <div className="panel">
-        <div className="section-title">
-          <h2>账户汇总</h2>
-        </div>
         <div className="asset-list">
           {rows.map((row) => {
             const flowGroups = [

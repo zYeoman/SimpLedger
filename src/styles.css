@@ -2197,7 +2197,6 @@ h1 {
   gap: 12px;
   border: 1px solid #e6ded1;
   border-radius: 8px;
-  background: #fff;
   padding: 12px;
 }
 
@@ -2226,10 +2225,7 @@ h1 {
   grid-template-columns: 42px minmax(0, 1fr) auto;
   gap: 10px 12px;
   align-items: center;
-  border: 1px solid #e6ded1;
-  border-radius: 8px;
-  background: #fff;
-  padding: 12px;
+  padding-bottom: 12px;
 }
 
 .asset-row strong,
