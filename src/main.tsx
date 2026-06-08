@@ -1444,6 +1444,12 @@ function formatCompactAmount(value: number) {
   return formatAmountPlain(value);
 }
 
+function fitStatsAmountStyle(value: number): React.CSSProperties {
+  const length = currency.format(value).length;
+  const fontSize = length >= 16 ? 9 : length >= 14 ? 10 : length >= 12 ? 12 : 14;
+  return { fontSize };
+}
+
 const categoryIconOptions = [
   { value: "eat", label: "吃饭" },
   { value: "hamburger", label: "汉堡" },
@@ -1772,30 +1778,30 @@ function StatsView({
       <div className="stats-summary">
         <div>
           <span>支出</span>
-          <strong className="expense">{currency.format(expenseTotal)}</strong>
+          <strong className="expense" title={currency.format(expenseTotal)} style={fitStatsAmountStyle(expenseTotal)}>{currency.format(expenseTotal)}</strong>
         </div>
         <div>
           <span>收入</span>
-          <strong>{currency.format(incomeTotal)}</strong>
+          <strong title={currency.format(incomeTotal)} style={fitStatsAmountStyle(incomeTotal)}>{currency.format(incomeTotal)}</strong>
         </div>
         <div>
           <span>结余</span>
-          <strong className={incomeTotal - expenseTotal < 0 ? "expense" : ""}>{currency.format(incomeTotal - expenseTotal)}</strong>
+          <strong className={incomeTotal - expenseTotal < 0 ? "expense" : ""} title={currency.format(incomeTotal - expenseTotal)} style={fitStatsAmountStyle(incomeTotal - expenseTotal)}>{currency.format(incomeTotal - expenseTotal)}</strong>
         </div>
       </div>
       {investmentItems.length > 0 && (
         <div className="stats-summary investment-stats-summary">
           <div>
             <span>理财支出</span>
-            <strong className="expense">{currency.format(investmentExpense)}</strong>
+            <strong className="expense" title={currency.format(investmentExpense)} style={fitStatsAmountStyle(investmentExpense)}>{currency.format(investmentExpense)}</strong>
           </div>
           <div>
             <span>理财收入</span>
-            <strong>{currency.format(investmentIncome)}</strong>
+            <strong title={currency.format(investmentIncome)} style={fitStatsAmountStyle(investmentIncome)}>{currency.format(investmentIncome)}</strong>
           </div>
           <div>
             <span>理财盈亏</span>
-            <strong className={investmentProfit < 0 ? "expense" : ""}>{currency.format(investmentProfit)}</strong>
+            <strong className={investmentProfit < 0 ? "expense" : ""} title={currency.format(investmentProfit)} style={fitStatsAmountStyle(investmentProfit)}>{currency.format(investmentProfit)}</strong>
           </div>
         </div>
       )}
