@@ -1050,8 +1050,6 @@ function EntryForm({
         createdAt: now,
       });
     }
-    setAmount("");
-    setNote("");
     onDone();
   }
 
