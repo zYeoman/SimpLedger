@@ -118,6 +118,7 @@ import {
 import "./styles.css";
 
 type View = "home" | "assets" | "stats" | "settings";
+type StatsMode = "month" | "year" | "all";
 
 const activeHistoryPopupTokens = new Set<symbol>();
 const viewOrder: View[] = ["home", "assets", "stats", "settings"];
@@ -150,7 +151,7 @@ function App() {
   const isEntryOpenRef = useRef(false);
   const entryHistoryPushedRef = useRef(false);
   const autoWebdavBackupStartedRef = useRef(false);
-  const [statsMode, setStatsMode] = useState<"month" | "year">("month");
+  const [statsMode, setStatsMode] = useState<StatsMode>("month");
   const [statsMonth, setStatsMonth] = useState(monthKey());
   const [statsYear, setStatsYear] = useState(String(new Date().getFullYear()));
   const [homeAccountFilters, setHomeAccountFilters] = useState<string[]>(readHomeAccountFilters);
@@ -247,6 +248,7 @@ function App() {
       const range = getMonthRange(statsMonth);
       return transactions.filter((item) => item.date >= range.start && item.date <= range.end);
     }
+    if (statsMode === "all") return transactions;
     return transactions.filter((item) => item.date.startsWith(`${statsYear}-`));
   }, [statsMode, statsMonth, statsYear, transactions]);
 
@@ -1735,7 +1737,7 @@ function StatsView({
   items: Transaction[];
   categories: ReturnType<typeof useCategories>;
   accounts: Account[];
-  mode: "month" | "year";
+  mode: StatsMode;
   month: string;
   year: string;
   goEdit: (transaction: Transaction) => void;
@@ -1814,47 +1816,65 @@ function StatsPeriodControls({
   setYear,
 }: {
   className?: string;
-  mode: "month" | "year";
-  setMode: (mode: "month" | "year") => void;
+  mode: StatsMode;
+  setMode: (mode: StatsMode) => void;
   month: string;
   setMonth: (month: string) => void;
   year: string;
   setYear: (year: string) => void;
 }) {
   const dateValue = mode === "month" ? new Date(`${month}-01T00:00:00`) : new Date(`${year}-01-01T00:00:00`);
-  const dateLabel = mode === "month" ? formatStatsMonthLabel(month) : year;
+  const dateLabel = mode === "month" ? formatStatsMonthLabel(month) : mode === "year" ? year : "全部";
 
   return (
     <div className={`stats-controls ${className ?? ""}`}>
-      <BackedDatePicker
-        historyKey="localMoneyStatsDatePicker"
-        title={mode === "month" ? "选择月份" : "选择年份"}
-        precision={mode === "month" ? "month" : "year"}
-        value={dateValue}
-        onConfirm={(value) => {
-          if (mode === "month") {
-            setMonth(toDateInputValue(value).slice(0, 7));
-          } else {
-            setYear(String(value.getFullYear()));
-          }
-        }}
-      >
-        {(_, actions) => (
-          <Button className="stats-control-button" color="primary" fill="solid" onClick={actions.open}>
-            {dateLabel}
-          </Button>
-        )}
-      </BackedDatePicker>
+      {mode === "all" ? (
+        <Button className="stats-control-button inert" color="primary" fill="solid">
+          {dateLabel}
+        </Button>
+      ) : (
+        <BackedDatePicker
+          historyKey="localMoneyStatsDatePicker"
+          title={mode === "month" ? "选择月份" : "选择年份"}
+          precision={mode === "month" ? "month" : "year"}
+          value={dateValue}
+          onConfirm={(value) => {
+            if (mode === "month") {
+              setMonth(toDateInputValue(value).slice(0, 7));
+            } else {
+              setYear(String(value.getFullYear()));
+            }
+          }}
+        >
+          {(_, actions) => (
+            <Button className="stats-control-button" color="primary" fill="solid" onClick={actions.open}>
+              {dateLabel}
+            </Button>
+          )}
+        </BackedDatePicker>
+      )}
       <Button
         className="stats-control-button"
         color="primary"
         fill="solid"
-        onClick={() => setMode(mode === "month" ? "year" : "month")}
+        onClick={() => setMode(nextStatsMode(mode))}
       >
-        {mode === "month" ? "按月统计" : "按年统计"}
+        {statsModeLabel[mode]}
       </Button>
     </div>
   );
+}
+
+const statsModeLabel: Record<StatsMode, string> = {
+  month: "按月统计",
+  year: "按年统计",
+  all: "全部统计",
+};
+
+function nextStatsMode(mode: StatsMode): StatsMode {
+  if (mode === "month") return "year";
+  if (mode === "year") return "all";
+  return "month";
 }
 
 function formatStatsMonthLabel(value: string) {

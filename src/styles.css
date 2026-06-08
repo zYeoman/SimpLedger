@@ -1152,6 +1152,10 @@ h1 {
   --background-color: #2f6f5e;
 }
 
+.stats-control-button.inert {
+  pointer-events: none;
+}
+
 .stats-summary {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
