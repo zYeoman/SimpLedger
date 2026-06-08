@@ -101,6 +101,7 @@ import {
   type Account,
   type AccountKind,
   type BackupPayload,
+  type Category,
   type RecurringFrequency,
   type Transaction,
   type TransactionType,
@@ -450,6 +451,11 @@ function titleForView(view: View) {
 
 function transactionBelongsToAccount(item: Transaction, account: string) {
   return (item.account || defaultAccounts[0]) === account || (item.type === "transfer" && item.toAccount === account);
+}
+
+function defaultAccountForCategory(categories: Pick<Category, "name" | "defaultAccount">[], categoryName: string, accountNames: string[]) {
+  const defaultAccount = categories.find((item) => item.name === categoryName)?.defaultAccount;
+  return defaultAccount && accountNames.includes(defaultAccount) ? defaultAccount : undefined;
 }
 
 function useHistoryBackedPopup(visible: boolean, setVisible: (visible: boolean) => void, stateKey: string) {
@@ -995,9 +1001,11 @@ function EntryForm({
   const [type, setType] = useState<TransactionType>(transaction?.type ?? "expense");
   const typeCategories = categories.filter((category) => category.type === type);
   const accountNames = accounts.length ? accounts.map((item) => item.name) : defaultAccounts;
+  const initialCategory = transaction?.category ?? typeCategories[0]?.name ?? "";
+  const initialDefaultAccount = defaultAccountForCategory(typeCategories, initialCategory, accountNames);
   const [amount, setAmount] = useState(transaction ? String(transaction.amount) : "");
-  const [category, setCategory] = useState(transaction?.category ?? typeCategories[0]?.name ?? "");
-  const [account, setAccount] = useState(transaction?.account ?? accountNames[0]);
+  const [category, setCategory] = useState(initialCategory);
+  const [account, setAccount] = useState(transaction?.account ?? initialDefaultAccount ?? accountNames[0]);
   const [toAccount, setToAccount] = useState(transaction?.toAccount ?? accountNames.find((item) => item !== (transaction?.account ?? accountNames[0])) ?? accountNames[0]);
   const [date, setDate] = useState(transaction?.date ?? todayInputValue());
   const [note, setNote] = useState(transaction?.note ?? "");
@@ -1005,7 +1013,7 @@ function EntryForm({
   useEffect(() => {
     if (type === "transfer") return;
     if (!typeCategories.some((item) => item.name === category)) {
-      setCategory(typeCategories[0]?.name ?? "");
+      selectCategory(typeCategories[0]?.name ?? "", typeCategories);
     }
   }, [type, categories.length, category]);
 
@@ -1054,6 +1062,14 @@ function EntryForm({
       });
     }
     onDone();
+  }
+
+  function selectCategory(name: string, sourceCategories = typeCategories) {
+    setCategory(name);
+    const nextDefaultAccount = defaultAccountForCategory(sourceCategories, name, accountNames);
+    if (nextDefaultAccount) {
+      setAccount(nextDefaultAccount);
+    }
   }
 
   function pressAmountKey(key: string) {
@@ -1147,7 +1163,7 @@ function EntryForm({
               type="button"
               key={`${item.type}-${item.name}`}
               className={category === item.name ? "selected" : ""}
-              onClick={() => setCategory(item.name)}
+              onClick={() => selectCategory(item.name)}
               style={{ "--swatch": item.color } as React.CSSProperties}
             >
               <span>
@@ -2455,13 +2471,13 @@ function SettingsView({
         </div>
       </div>
       <Popup visible={isAccountSettingsOpen} onMaskClick={closeAccountSettings} bodyClassName="management-popup">
-        <AccountSettingsPanel accounts={accounts} transactions={transactions} transferRules={transferRules} />
+        <AccountSettingsPanel accounts={accounts} transactions={transactions} transferRules={transferRules} categories={categories} />
       </Popup>
       <Popup visible={isTransferRulesOpen} onMaskClick={closeTransferRules} bodyClassName="management-popup">
         <RecurringRulesPanel accounts={accounts} categories={categories} transferRules={transferRules} />
       </Popup>
       <Popup visible={isCategorySettingsOpen} onMaskClick={closeCategorySettings} bodyClassName="management-popup">
-        <CategorySettingsPanel categories={categories} transactions={transactions} />
+        <CategorySettingsPanel categories={categories} transactions={transactions} accounts={accounts} />
       </Popup>
     </section>
   );
@@ -2471,10 +2487,12 @@ function AccountSettingsPanel({
   accounts,
   transactions,
   transferRules,
+  categories,
 }: {
   accounts: Account[];
   transactions: Transaction[];
   transferRules: TransferRule[];
+  categories: ReturnType<typeof useCategories>;
 }) {
   const [newAccount, setNewAccount] = useState("");
   const [newAccountKind, setNewAccountKind] = useState<AccountKind>("cash");
@@ -2508,13 +2526,15 @@ function AccountSettingsPanel({
         {accountRecords.map((account) => {
           const usageCount = transactions.filter((item) => transactionBelongsToAccount(item, account.name)).length;
           const ruleCount = transferRules.filter((rule) => (rule.account || rule.fromAccount) === account.name || rule.toAccount === account.name).length;
-          const dependencyCount = usageCount + ruleCount;
+          const categoryCount = categories.filter((category) => category.defaultAccount === account.name).length;
+          const dependencyCount = usageCount + ruleCount + categoryCount;
           return (
             <article className="account-settings-row" key={account.name}>
               <div>
                 <strong>{account.name}</strong>
                 <span>
                   {usageCount} 笔记录 · {ruleCount} 条规则
+                  {categoryCount > 0 ? ` · ${categoryCount} 个默认分类` : ""}
                 </span>
               </div>
               <div className="asset-actions">
@@ -2623,8 +2643,9 @@ function RecurringRuleEditor({
   const accountNames = accounts.length ? accounts.map((item) => item.name) : defaultAccounts;
   const [type, setType] = useState<TransactionType>("expense");
   const typeCategories = categories.filter((category) => category.type === type);
-  const [category, setCategory] = useState(typeCategories[0]?.name ?? "");
-  const [account, setAccount] = useState(accountNames[0] ?? "");
+  const initialCategory = typeCategories[0]?.name ?? "";
+  const [category, setCategory] = useState(initialCategory);
+  const [account, setAccount] = useState(defaultAccountForCategory(typeCategories, initialCategory, accountNames) ?? accountNames[0] ?? "");
   const [toAccount, setToAccount] = useState(accountNames.find((item) => item !== (accountNames[0] ?? "")) ?? accountNames[0] ?? "");
   const [amount, setAmount] = useState("");
   const [frequency, setFrequency] = useState<RecurringFrequency>("daily");
@@ -2641,7 +2662,7 @@ function RecurringRuleEditor({
   useEffect(() => {
     if (type === "transfer") return;
     if (!typeCategories.some((item) => item.name === category)) {
-      setCategory(typeCategories[0]?.name ?? "");
+      selectRecurringCategory(typeCategories[0]?.name ?? "", typeCategories);
     }
   }, [type, categories.length, category]);
 
@@ -2680,6 +2701,14 @@ function RecurringRuleEditor({
     onDone();
   }
 
+  function selectRecurringCategory(name: string, sourceCategories = typeCategories) {
+    setCategory(name);
+    const nextDefaultAccount = defaultAccountForCategory(sourceCategories, name, accountNames);
+    if (nextDefaultAccount) {
+      setAccount(nextDefaultAccount);
+    }
+  }
+
   return (
     <div className="management-panel">
       <div className="popup-title">新建周期记账</div>
@@ -2704,7 +2733,7 @@ function RecurringRuleEditor({
         </label>
         <div className="recurring-choice-grid">
           {type !== "transfer" && (
-            <BackedPicker historyKey="localMoneyRecurringCategoryPicker" columns={categoryColumns} value={[category]} onConfirm={(value) => setCategory(String(value[0]))}>
+            <BackedPicker historyKey="localMoneyRecurringCategoryPicker" columns={categoryColumns} value={[category]} onConfirm={(value) => selectRecurringCategory(String(value[0]))}>
               {(_, actions) => (
                 <Button className="recurring-choice-button" color="primary" fill="solid" onClick={actions.open}>
                   {category || "选择分类"}
@@ -2835,23 +2864,35 @@ function formatRecurringDays(rule: TransferRule) {
   return "";
 }
 
-function CategorySettingsPanel({ categories, transactions }: { categories: ReturnType<typeof useCategories>; transactions: Transaction[] }) {
+function CategorySettingsPanel({
+  categories,
+  transactions,
+  accounts,
+}: {
+  categories: ReturnType<typeof useCategories>;
+  transactions: Transaction[];
+  accounts: Account[];
+}) {
   const [newCategoryName, setNewCategoryName] = useState("");
-  const [newCategoryType, setNewCategoryType] = useState<TransactionType>("expense");
+  const [categoryManageType, setCategoryManageType] = useState<Extract<TransactionType, "expense" | "income">>("expense");
   const [newCategoryColor, setNewCategoryColor] = useState("#6f7680");
   const [newCategoryIcon, setNewCategoryIcon] = useState("wallet");
+  const [newCategoryDefaultAccount, setNewCategoryDefaultAccount] = useState("");
+  const accountNames = accounts.length ? accounts.map((item) => item.name) : defaultAccounts;
+  const visibleCategories = categories.filter((category) => category.type === categoryManageType);
 
   async function addCategory(event: React.FormEvent) {
     event.preventDefault();
     const name = newCategoryName.trim();
     if (!name) return;
-    const exists = categories.some((category) => category.name === name && category.type === newCategoryType);
+    const exists = categories.some((category) => category.name === name && category.type === categoryManageType);
     if (exists) return;
     await db.categories.add({
       name,
-      type: newCategoryType,
+      type: categoryManageType,
       color: newCategoryColor,
       icon: newCategoryIcon,
+      defaultAccount: newCategoryDefaultAccount || undefined,
     });
     setNewCategoryName("");
   }
@@ -2859,18 +2900,23 @@ function CategorySettingsPanel({ categories, transactions }: { categories: Retur
   return (
     <div className="management-panel">
       <div className="popup-title">分类设置</div>
+      <div className="category-manage-tabs">
+        <button type="button" className={categoryManageType === "expense" ? "selected" : ""} onClick={() => setCategoryManageType("expense")}>
+          支出
+        </button>
+        <button type="button" className={categoryManageType === "income" ? "selected" : ""} onClick={() => setCategoryManageType("income")}>
+          收入
+        </button>
+      </div>
       <form className="category-add-form" onSubmit={addCategory}>
         <input placeholder="新增分类" value={newCategoryName} onChange={(event) => setNewCategoryName(event.target.value)} />
-        <select value={newCategoryType} onChange={(event) => setNewCategoryType(event.target.value as TransactionType)}>
-          <option value="expense">支出</option>
-          <option value="income">收入</option>
-        </select>
+        <CategoryDefaultAccountButton value={newCategoryDefaultAccount} accounts={accountNames} onChange={setNewCategoryDefaultAccount} />
         <ColorPicker value={newCategoryColor} onChange={setNewCategoryColor} />
         <IconPicker value={newCategoryIcon} color={newCategoryColor} onChange={setNewCategoryIcon} />
         <button type="submit">添加</button>
       </form>
       <div className="category-editor-list">
-        {categories.map((category) => {
+        {visibleCategories.map((category) => {
           const usageCount = transactions.filter((item) => item.category === category.name && item.type === category.type).length;
           return (
             <div className="category-editor-row" key={`${category.type}-${category.name}`}>
@@ -2878,9 +2924,14 @@ function CategorySettingsPanel({ categories, transactions }: { categories: Retur
               <div>
                 <strong>{category.name}</strong>
                 <span>
-                  {typeLabel[category.type]} · {usageCount} 笔
+                  {typeLabel[category.type]} · {usageCount} 笔{category.defaultAccount ? ` · 默认 ${category.defaultAccount}` : ""}
                 </span>
               </div>
+              <CategoryDefaultAccountButton
+                value={category.defaultAccount ?? ""}
+                accounts={accountNames}
+                onChange={(defaultAccount) => category.id && db.categories.update(category.id, { defaultAccount: defaultAccount || undefined })}
+              />
               <ColorPicker value={category.color} onChange={(color) => category.id && db.categories.update(category.id, { color })} />
               <button type="button" className="category-delete" onClick={() => category.id && db.categories.delete(category.id)}>
                 删除
@@ -2890,6 +2941,55 @@ function CategorySettingsPanel({ categories, transactions }: { categories: Retur
         })}
       </div>
     </div>
+  );
+}
+
+function CategoryDefaultAccountButton({
+  value,
+  accounts,
+  onChange,
+}: {
+  value: string;
+  accounts: string[];
+  onChange: (value: string) => void;
+}) {
+  const [visible, setVisible] = useState(false);
+  const close = useHistoryBackedPopup(visible, setVisible, "localMoneyCategoryDefaultAccountPopup");
+
+  return (
+    <>
+      <button type="button" className={`category-default-account-button ${value ? "selected" : ""}`} onClick={() => setVisible(true)}>
+        {value || "默认账户"}
+      </button>
+      <Popup visible={visible} onMaskClick={close} bodyClassName="account-select-popup">
+        <div className="popup-title">默认账户</div>
+        <div className="account-option-list">
+          <button
+            type="button"
+            className={!value ? "selected" : ""}
+            onClick={() => {
+              onChange("");
+              close();
+            }}
+          >
+            不指定
+          </button>
+          {accounts.map((account) => (
+            <button
+              type="button"
+              key={account}
+              className={value === account ? "selected" : ""}
+              onClick={() => {
+                onChange(account);
+                close();
+              }}
+            >
+              {account}
+            </button>
+          ))}
+        </div>
+      </Popup>
+    </>
   );
 }
 

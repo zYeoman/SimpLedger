@@ -22,6 +22,7 @@ export type Category = {
   type: TransactionType;
   color: string;
   icon?: string;
+  defaultAccount?: string;
 };
 
 export type Account = {

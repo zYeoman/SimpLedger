@@ -1557,12 +1557,40 @@ h1 {
   gap: 10px;
 }
 
+.category-manage-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px;
+  margin-bottom: 12px;
+  border: 1px solid #ded7cc;
+  border-radius: 8px;
+  background: #fffaf2;
+  padding: 4px;
+}
+
+.category-manage-tabs button {
+  min-height: 40px;
+  border-radius: 6px;
+  background: transparent;
+  color: #4d5753;
+  font-weight: 900;
+}
+
+.category-manage-tabs button.selected {
+  background: #2f6f5e;
+  color: #fff;
+}
+
 .category-add-form {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 72px 42px auto;
+  grid-template-columns: minmax(92px, 1fr) 42px 42px auto;
   gap: 8px;
   margin-bottom: 14px;
   align-items: center;
+}
+
+.category-add-form input {
+  grid-column: 1 / -1;
 }
 
 .category-add-form input,
@@ -1593,7 +1621,7 @@ h1 {
 
 .category-editor-row {
   display: grid;
-  grid-template-columns: 42px minmax(0, 1fr) 42px auto;
+  grid-template-columns: 42px minmax(0, 1fr) 92px 42px auto;
   gap: 10px;
   align-items: center;
   border: 1px solid #e6ded1;
@@ -1648,6 +1676,26 @@ h1 {
   color: #27322f;
   padding: 8px 6px;
   font-weight: 700;
+}
+
+.category-default-account-button {
+  min-width: 0;
+  min-height: 36px;
+  overflow: hidden;
+  border: 1px solid #e6ded1;
+  border-radius: 8px;
+  background: #fffaf2;
+  color: #4d5753;
+  padding: 0 8px;
+  font-size: 12px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.category-default-account-button.selected {
+  border-color: #2f6f5e;
+  color: #2f6f5e;
 }
 
 .category-delete {
@@ -2282,7 +2330,16 @@ h1 {
   }
 
   .category-add-form {
-    grid-template-columns: 1fr 72px;
+    grid-template-columns: minmax(92px, 1fr) 42px 42px auto;
+  }
+
+  .category-editor-row {
+    grid-template-columns: 42px minmax(0, 1fr) auto;
+  }
+
+  .category-editor-row .category-default-account-button {
+    grid-column: 2 / -1;
+    width: 100%;
   }
 
   .asset-add-form,
