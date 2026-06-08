@@ -2964,7 +2964,7 @@ function CategorySettingsPanel({
               <div>
                 <strong>{category.name}</strong>
                 <span>
-                  {typeLabel[category.type]} · {usageCount} 笔{category.defaultAccount ? ` · 默认 ${category.defaultAccount}` : ""}
+                  {typeLabel[category.type]} · {usageCount} 笔
                 </span>
               </div>
               <CategoryDefaultAccountButton
