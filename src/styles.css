@@ -413,15 +413,6 @@ h1 {
   font-size: 20px;
 }
 
-.sheet-title button {
-  min-height: 36px;
-  border-radius: 8px;
-  background: #e9e1d5;
-  color: #4d5753;
-  padding: 0 12px;
-  font-weight: 800;
-}
-
 @keyframes page-rise {
   from {
     transform: translateY(100%);
@@ -1314,6 +1305,76 @@ h1 {
   color: #77807b;
   font-size: 13px;
   font-weight: 800;
+}
+
+.stats-detail-menu-wrap {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.stats-detail-menu-button {
+  display: grid;
+  place-items: center;
+  grid-template-columns: repeat(3, 3px);
+  gap: 4px;
+  width: 30px;
+  min-height: 30px;
+  height: 30px;
+  padding: 0;
+  background: transparent;
+}
+
+.stats-detail-menu-button span {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: #4d5753;
+}
+
+.stats-detail-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 2;
+  display: grid;
+  min-width: 132px;
+  overflow: hidden;
+  border: 1px solid #e6ded1;
+  border-radius: 8px;
+  background: #fffaf2;
+  box-shadow: 0 10px 24px rgba(64, 51, 37, 0.16);
+  transform-origin: top right;
+  animation: stats-menu-pop 140ms ease-out;
+}
+
+@keyframes stats-menu-pop {
+  from {
+    transform: translateY(-4px) scale(0.96);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+.stats-detail-menu button {
+  min-height: 42px;
+  background: transparent;
+  color: #27322f;
+  padding: 0 12px;
+  text-align: left;
+  font-weight: 900;
+}
+
+.stats-detail-menu button + button {
+  border-top: 1px solid #eee7dc;
+}
+
+.stats-detail-menu button.selected {
+  color: #2f6f5e;
+  background: #eef0e7;
 }
 
 .rank-list {

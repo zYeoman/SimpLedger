@@ -1876,6 +1876,8 @@ type CategoryStat = {
   icon?: string;
 };
 
+type StatsDetailSort = "dateDesc" | "amountDesc";
+
 function buildCategoryStats(items: Transaction[], categories: ReturnType<typeof useCategories>, type: TransactionType): CategoryStat[] {
   const typedItems = items.filter((item) => item.type === type);
   const total = sumByType(typedItems, type);
@@ -1917,6 +1919,8 @@ function StatsCategorySection({
   const [isExpanded, setIsExpanded] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<CategoryStat | null>(null);
   const [isDetailClosing, setIsDetailClosing] = useState(false);
+  const [detailSort, setDetailSort] = useState<StatsDetailSort>("dateDesc");
+  const [isDetailMenuOpen, setIsDetailMenuOpen] = useState(false);
   const closeSelectedCategory = useHistoryBackedPopup(Boolean(selectedCategory), (visible) => {
     if (!visible) animateSelectedCategoryClose();
   }, `localMoneyStatsCategoryDetail${title}`);
@@ -1924,7 +1928,7 @@ function StatsCategorySection({
   const dataSignature = data.map((item) => `${item.name}:${item.value}`).join("|");
   const hasMore = data.length > defaultVisibleCount;
   const visibleData = isExpanded || !hasMore ? data : data.slice(0, defaultVisibleCount);
-  const detailItems = selectedCategory ? items.filter((item) => item.category === selectedCategory.name) : [];
+  const detailItems = selectedCategory ? sortStatsDetailItems(items.filter((item) => item.category === selectedCategory.name), detailSort) : [];
 
   useEffect(() => {
     setIsExpanded(false);
@@ -1936,11 +1940,14 @@ function StatsCategorySection({
 
   function openSelectedCategory(item: CategoryStat) {
     setIsDetailClosing(false);
+    setDetailSort("dateDesc");
+    setIsDetailMenuOpen(false);
     setSelectedCategory(item);
   }
 
   function animateSelectedCategoryClose() {
     setIsDetailClosing(true);
+    setIsDetailMenuOpen(false);
     window.setTimeout(() => {
       setSelectedCategory(null);
       setIsDetailClosing(false);
@@ -2008,7 +2015,40 @@ function StatsCategorySection({
                       <h2 id="stats-detail-title">{selectedCategory.name}</h2>
                       <p>{`${formatAmountPlain(selectedCategory.value)} · ${selectedCategory.percent.toFixed(2)}% · ${detailItems.length} 笔`}</p>
                     </div>
-                    <button onClick={closeSelectedCategory}>关闭</button>
+                    <div className="stats-detail-menu-wrap">
+                      <button type="button" className="stats-detail-menu-button" aria-label="更多操作" onClick={() => setIsDetailMenuOpen((current) => !current)}>
+                        <span />
+                        <span />
+                        <span />
+                      </button>
+                      {isDetailMenuOpen && (
+                        <div className="stats-detail-menu" role="menu">
+                          <button
+                            type="button"
+                            className={detailSort === "dateDesc" ? "selected" : ""}
+                            onClick={() => {
+                              setDetailSort("dateDesc");
+                              setIsDetailMenuOpen(false);
+                            }}
+                          >
+                            时间排序
+                          </button>
+                          <button
+                            type="button"
+                            className={detailSort === "amountDesc" ? "selected" : ""}
+                            onClick={() => {
+                              setDetailSort("amountDesc");
+                              setIsDetailMenuOpen(false);
+                            }}
+                          >
+                            金额排序
+                          </button>
+                          <button type="button" onClick={closeSelectedCategory}>
+                            关闭
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <TransactionList items={detailItems} categories={categories} goEdit={goEdit} />
                 </div>
@@ -2019,6 +2059,15 @@ function StatsCategorySection({
       )}
     </section>
   );
+}
+
+function sortStatsDetailItems(items: Transaction[], sort: StatsDetailSort) {
+  return [...items].sort((a, b) => {
+    if (sort === "amountDesc") return b.amount - a.amount;
+    const aTime = new Date(a.createdAt || `${a.date}T00:00:00`).getTime();
+    const bTime = new Date(b.createdAt || `${b.date}T00:00:00`).getTime();
+    return bTime - aTime;
+  });
 }
 
 function SettingsView({
