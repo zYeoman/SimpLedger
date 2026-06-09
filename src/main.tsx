@@ -705,20 +705,19 @@ function HomeView({
 }) {
   const expense = sumByType(items, "expense");
   const income = sumByType(items, "income");
+  const [isAlmanacOpen, setIsAlmanacOpen] = useState(false);
 
   return (
-    <>
+    <div className="home-view">
       <section className="metric-grid">
         <Metric label="本月支出" value={currency.format(expense)} tone="expense" />
         <Metric label="本月收入" value={currency.format(income)} tone="income" />
       </section>
       <section className="panel detail-panel">
-        <div className="section-title today-section-title">
-          <TodayAlmanacHeader />
-        </div>
+        <TodayAlmanacHeader isOpen={isAlmanacOpen} setIsOpen={setIsAlmanacOpen} />
         {detailItems.length === 0 ? <EmptyState /> : <VirtualTransactionList items={detailItems} categories={categories} goEdit={goEdit} />}
       </section>
-    </>
+    </div>
   );
 }
 
@@ -728,10 +727,23 @@ type TodayAlmanac = {
   lunar: string;
   festival: string;
   nextHoliday: string;
+  pillars: string[];
+  recommends: string;
+  avoids: string;
 };
 
-function TodayAlmanacHeader() {
+function TodayAlmanacHeader({
+  isOpen,
+  setIsOpen,
+}: {
+  isOpen: boolean;
+  setIsOpen: React.Dispatch<React.SetStateAction<boolean>>;
+}) {
   const [info, setInfo] = useState<TodayAlmanac>(() => buildFallbackTodayAlmanac());
+
+  useEffect(() => {
+    window.requestAnimationFrame(() => window.dispatchEvent(new Event("localMoneyLayoutChange")));
+  }, [isOpen]);
 
   useEffect(() => {
     let isActive = true;
@@ -743,6 +755,9 @@ function TodayAlmanacHeader() {
         const solarDay = SolarDay.fromYmd(now.getFullYear(), now.getMonth() + 1, now.getDate());
         const lunarDay = solarDay.getLunarDay();
         const termDay = solarDay.getTermDay();
+        const pillars = String(lunarDay.getThreePillars()).split(" ");
+        const currentHour = lunarDay.getHours()[now.getHours() === 23 ? 12 : Math.floor((now.getHours() + 1) / 2)];
+        const hourPillar = currentHour ? String(currentHour.getSixtyCycle()) : "";
         const festival = [
           solarDay.getFestival(),
           lunarDay.getFestival(),
@@ -755,9 +770,12 @@ function TodayAlmanacHeader() {
         setInfo({
           solar: formatTodaySolar(now),
           weekday: new Intl.DateTimeFormat("zh-CN", { weekday: "long" }).format(now),
-          lunar: lunarDay.toString(),
+          lunar: `${lunarDay.getLunarMonth().getName()}${lunarDay.getName()}`,
           festival,
           nextHoliday: findNextLegalHolidayLabel(now, LegalHoliday),
+          pillars: [...pillars, hourPillar].filter(Boolean),
+          recommends: lunarDay.getRecommends().map(String).join(" "),
+          avoids: lunarDay.getAvoids().map(String).join(" "),
         });
       } catch {
         if (isActive) setInfo(buildFallbackTodayAlmanac());
@@ -771,13 +789,36 @@ function TodayAlmanacHeader() {
   }, []);
 
   return (
-    <div className="today-almanac">
-      <div>
-        <h2>{info.solar}</h2>
-        <span>{info.weekday}</span>
-      </div>
-      <p>{[info.lunar, info.festival, info.nextHoliday].filter(Boolean).join(" · ")}</p>
-    </div>
+    <section className={`today-almanac ${isOpen ? "open" : ""}`}>
+      <button type="button" className="today-almanac-trigger" onClick={() => setIsOpen((current) => !current)}>
+        <div>
+          <h2>{info.solar}</h2>
+          <span>{info.weekday}</span>
+        </div>
+        <p>{[info.lunar, info.festival, info.nextHoliday].filter(Boolean).join(" · ")}</p>
+      </button>
+      {isOpen && (
+        <div className="huangli-widget">
+          <i>{info.lunar}</i>
+          <ul>
+            <li>年</li>
+            <li>月</li>
+            <li>日</li>
+            <li>时</li>
+          </ul>
+          <ol>
+            {info.pillars.map((pillar, index) => (
+              <li key={`${index}-stem`}>{pillar.slice(0, 1)}</li>
+            ))}
+            {info.pillars.map((pillar, index) => (
+              <li key={`${index}-branch`}>{pillar.slice(1, 2)}</li>
+            ))}
+          </ol>
+          <b>{info.recommends || "无"}</b>
+          <p>{info.avoids || "无"}</p>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -789,6 +830,9 @@ function buildFallbackTodayAlmanac(): TodayAlmanac {
     lunar: "正在加载农历",
     festival: "",
     nextHoliday: "",
+    pillars: ["", "", "", ""],
+    recommends: "正在加载",
+    avoids: "正在加载",
   };
 }
 

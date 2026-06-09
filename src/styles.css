@@ -237,14 +237,8 @@ h1 {
   padding: 16px 0;
 }
 
-.detail-panel .section-title,
 .detail-panel .empty-state {
   padding-inline: 16px;
-}
-
-.detail-panel .today-section-title {
-  align-items: stretch;
-  margin-bottom: 16px;
 }
 
 .detail-panel .virtual-month-title {
@@ -268,17 +262,35 @@ h1 {
   font-size: 18px;
 }
 
-.today-almanac {
+.home-view {
   display: grid;
-  width: 100%;
-  gap: 8px;
+  gap: 14px;
 }
 
-.today-almanac > div:first-child {
+.today-almanac {
+  display: grid;
+  gap: 10px;
+  overflow: hidden;
+}
+
+.today-almanac-trigger {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px 12px;
+  align-items: center;
+  width: 100%;
+  background: transparent;
+  padding: 14px;
+  text-align: left;
+}
+
+.today-almanac-trigger > div {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
+  min-width: 0;
+  grid-column: 1;
 }
 
 .today-almanac h2 {
@@ -287,11 +299,128 @@ h1 {
   line-height: 1.15;
 }
 
-.today-almanac > div:first-child span,
+.today-almanac-trigger > div span,
 .today-almanac p {
   color: #77807b;
   font-size: 13px;
   font-weight: 800;
+}
+
+.today-almanac-trigger p {
+  grid-column: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.today-almanac-trigger svg {
+  grid-row: 1 / span 2;
+  grid-column: 2;
+  color: #77807b;
+  transition: transform 0.18s ease;
+}
+
+.today-almanac.open .today-almanac-trigger svg {
+  transform: rotate(180deg);
+}
+
+.huangli-widget {
+  position: relative;
+  min-height: 150px;
+  margin: -2px 14px 14px;
+  border-top: 1px solid #eee7dc;
+  padding-top: 12px;
+}
+
+.huangli-widget ul,
+.huangli-widget ol {
+  position: absolute;
+  top: 14px;
+  right: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 40px);
+  width: 160px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.huangli-widget ol {
+  top: 34px;
+  grid-template-rows: repeat(2, 22px);
+}
+
+.huangli-widget li {
+  min-width: 0;
+  text-align: center;
+}
+
+.huangli-widget ul li {
+  color: #aaa39a;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.huangli-widget ol li {
+  color: #27322f;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.huangli-widget i {
+  position: absolute;
+  top: 18px;
+  left: 0;
+  color: #27322f;
+  font-size: 20px;
+  font-style: normal;
+  font-weight: 900;
+}
+
+.huangli-widget b,
+.huangli-widget p {
+  position: absolute;
+  right: 0;
+  left: 0;
+  min-height: 30px;
+  padding-left: 30px;
+  color: #5f6965;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.6;
+}
+
+.huangli-widget b {
+  top: 76px;
+}
+
+.huangli-widget p {
+  top: 112px;
+}
+
+.huangli-widget b::before,
+.huangli-widget p::before {
+  position: absolute;
+  top: -1px;
+  left: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--theme-primary);
+  color: #fff;
+  font-size: 12px;
+  line-height: 22px;
+  text-align: center;
+}
+
+.huangli-widget b::before {
+  content: "宜";
+}
+
+.huangli-widget p::before {
+  content: "忌";
+  background: #ff5a5d;
 }
 
 .entry-form,
