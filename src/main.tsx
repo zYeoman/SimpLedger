@@ -825,7 +825,7 @@ function TodayAlmanacHeader({
           <h2>{info.solar}</h2>
           <span>{info.weekday}</span>
         </div>
-        <p>{[info.lunar, info.festival, info.nextHoliday].filter(Boolean).join(" · ")}</p>
+        <p>{[!isOpen ? info.lunar : "", info.festival, info.nextHoliday].filter(Boolean).join(" · ")}</p>
       </button>
       <div className="huangli-collapse" aria-hidden={!isOpen}>
         <div className="huangli-widget">
