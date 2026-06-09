@@ -797,27 +797,29 @@ function TodayAlmanacHeader({
         </div>
         <p>{[info.lunar, info.festival, info.nextHoliday].filter(Boolean).join(" · ")}</p>
       </button>
-      {isOpen && (
+      <div className="huangli-collapse" aria-hidden={!isOpen}>
         <div className="huangli-widget">
-          <i>{info.lunar}</i>
-          <ul>
-            <li>年</li>
-            <li>月</li>
-            <li>日</li>
-            <li>时</li>
-          </ul>
-          <ol>
-            {info.pillars.map((pillar, index) => (
-              <li key={`${index}-stem`}>{pillar.slice(0, 1)}</li>
-            ))}
-            {info.pillars.map((pillar, index) => (
-              <li key={`${index}-branch`}>{pillar.slice(1, 2)}</li>
-            ))}
-          </ol>
-          <b>{info.recommends || "无"}</b>
-          <p>{info.avoids || "无"}</p>
+          <div>
+            <i>{info.lunar}</i>
+            <ul>
+              <li>年</li>
+              <li>月</li>
+              <li>日</li>
+              <li>时</li>
+            </ul>
+            <ol>
+              {info.pillars.map((pillar, index) => (
+                <li key={`${index}-stem`}>{pillar.slice(0, 1)}</li>
+              ))}
+              {info.pillars.map((pillar, index) => (
+                <li key={`${index}-branch`}>{pillar.slice(1, 2)}</li>
+              ))}
+            </ol>
+            <b>{info.recommends || "无"}</b>
+            <p>{info.avoids || "无"}</p>
+          </div>
         </div>
-      )}
+      </div>
     </section>
   );
 }
