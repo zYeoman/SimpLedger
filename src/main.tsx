@@ -740,6 +740,7 @@ function TodayAlmanacHeader({
   setIsOpen: React.Dispatch<React.SetStateAction<boolean>>;
 }) {
   const [info, setInfo] = useState<TodayAlmanac>(() => buildFallbackTodayAlmanac());
+  const latestAlmanacDateRef = useRef(todayInputValue());
 
   useEffect(() => {
     window.requestAnimationFrame(() => window.dispatchEvent(new Event("localMoneyLayoutChange")));
@@ -747,6 +748,7 @@ function TodayAlmanacHeader({
 
   useEffect(() => {
     let isActive = true;
+    let midnightTimer: number | undefined;
 
     async function loadAlmanac() {
       try {
@@ -777,14 +779,42 @@ function TodayAlmanacHeader({
           recommends: lunarDay.getRecommends().map(String).join(" "),
           avoids: lunarDay.getAvoids().map(String).join(" "),
         });
+        latestAlmanacDateRef.current = todayInputValue();
       } catch {
         if (isActive) setInfo(buildFallbackTodayAlmanac());
       }
     }
 
+    function scheduleNextMidnightRefresh() {
+      window.clearTimeout(midnightTimer);
+      const now = new Date();
+      const nextMidnight = new Date(now);
+      nextMidnight.setHours(24, 0, 1, 0);
+      midnightTimer = window.setTimeout(() => {
+        loadAlmanac();
+        scheduleNextMidnightRefresh();
+      }, nextMidnight.getTime() - now.getTime());
+    }
+
+    function refreshIfDateChanged() {
+      if (document.visibilityState === "hidden") return;
+      if (latestAlmanacDateRef.current !== todayInputValue()) {
+        loadAlmanac();
+      }
+      scheduleNextMidnightRefresh();
+    }
+
     loadAlmanac();
+    scheduleNextMidnightRefresh();
+    document.addEventListener("visibilitychange", refreshIfDateChanged);
+    window.addEventListener("focus", refreshIfDateChanged);
+    window.addEventListener("pageshow", refreshIfDateChanged);
     return () => {
       isActive = false;
+      window.clearTimeout(midnightTimer);
+      document.removeEventListener("visibilitychange", refreshIfDateChanged);
+      window.removeEventListener("focus", refreshIfDateChanged);
+      window.removeEventListener("pageshow", refreshIfDateChanged);
     };
   }, []);
 
