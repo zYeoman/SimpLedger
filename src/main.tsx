@@ -740,7 +740,7 @@ function TodayAlmanacHeader({
   setIsOpen: React.Dispatch<React.SetStateAction<boolean>>;
 }) {
   const [info, setInfo] = useState<TodayAlmanac>(() => buildFallbackTodayAlmanac());
-  const latestAlmanacDateRef = useRef(todayInputValue());
+  const latestAlmanacKeyRef = useRef(almanacRefreshKey());
 
   useEffect(() => {
     window.requestAnimationFrame(() => window.dispatchEvent(new Event("localMoneyLayoutChange")));
@@ -748,7 +748,7 @@ function TodayAlmanacHeader({
 
   useEffect(() => {
     let isActive = true;
-    let midnightTimer: number | undefined;
+    let refreshTimer: number | undefined;
 
     async function loadAlmanac() {
       try {
@@ -779,42 +779,38 @@ function TodayAlmanacHeader({
           recommends: lunarDay.getRecommends().map(String).join(" "),
           avoids: lunarDay.getAvoids().map(String).join(" "),
         });
-        latestAlmanacDateRef.current = todayInputValue();
+        latestAlmanacKeyRef.current = almanacRefreshKey(now);
       } catch {
         if (isActive) setInfo(buildFallbackTodayAlmanac());
       }
     }
 
-    function scheduleNextMidnightRefresh() {
-      window.clearTimeout(midnightTimer);
-      const now = new Date();
-      const nextMidnight = new Date(now);
-      nextMidnight.setHours(24, 0, 1, 0);
-      midnightTimer = window.setTimeout(() => {
-        loadAlmanac();
-        scheduleNextMidnightRefresh();
-      }, nextMidnight.getTime() - now.getTime());
+    function startForegroundRefreshTimer() {
+      window.clearInterval(refreshTimer);
+      refreshTimer = window.setInterval(() => {
+        refreshIfAlmanacStale();
+      }, 60 * 1000);
     }
 
-    function refreshIfDateChanged() {
+    function refreshIfAlmanacStale() {
       if (document.visibilityState === "hidden") return;
-      if (latestAlmanacDateRef.current !== todayInputValue()) {
+      if (latestAlmanacKeyRef.current !== almanacRefreshKey()) {
         loadAlmanac();
       }
-      scheduleNextMidnightRefresh();
+      startForegroundRefreshTimer();
     }
 
     loadAlmanac();
-    scheduleNextMidnightRefresh();
-    document.addEventListener("visibilitychange", refreshIfDateChanged);
-    window.addEventListener("focus", refreshIfDateChanged);
-    window.addEventListener("pageshow", refreshIfDateChanged);
+    startForegroundRefreshTimer();
+    document.addEventListener("visibilitychange", refreshIfAlmanacStale);
+    window.addEventListener("focus", refreshIfAlmanacStale);
+    window.addEventListener("pageshow", refreshIfAlmanacStale);
     return () => {
       isActive = false;
-      window.clearTimeout(midnightTimer);
-      document.removeEventListener("visibilitychange", refreshIfDateChanged);
-      window.removeEventListener("focus", refreshIfDateChanged);
-      window.removeEventListener("pageshow", refreshIfDateChanged);
+      window.clearInterval(refreshTimer);
+      document.removeEventListener("visibilitychange", refreshIfAlmanacStale);
+      window.removeEventListener("focus", refreshIfAlmanacStale);
+      window.removeEventListener("pageshow", refreshIfAlmanacStale);
     };
   }, []);
 
@@ -1636,6 +1632,12 @@ function formatAssetRunway(totalBalance: number, dailyExpense: number) {
   if (dailyExpense <= 0) return "∞";
   const days = Math.floor(totalBalance / dailyExpense);
   return days > 9999 ? ">9999 天" : `${days} 天`;
+}
+
+function almanacRefreshKey(date = new Date()) {
+  const day = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  const hourIndex = date.getHours() === 23 ? 12 : Math.floor((date.getHours() + 1) / 2);
+  return `${day}-${hourIndex}`;
 }
 
 function buildAssetRunwayMetrics(items: Transaction[], accounts: Account[]) {
