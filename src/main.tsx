@@ -262,10 +262,7 @@ function App() {
     if (homeAccountFilters.length === 0) return currentMonthItems;
     return currentMonthItems.filter((item) => homeAccountFilters.some((account) => transactionBelongsToAccount(item, account)));
   }, [homeAccountFilters, currentMonthItems]);
-  const homeDetailItems = useMemo(() => {
-    if (homeAccountFilters.length === 0) return transactions;
-    return transactions.filter((item) => homeAccountFilters.some((account) => transactionBelongsToAccount(item, account)));
-  }, [homeAccountFilters, transactions]);
+  const homeDetailItems = transactions;
   const statsItems = useMemo(() => {
     if (statsMode === "month") {
       const range = getMonthRange(statsMonth);
