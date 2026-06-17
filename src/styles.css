@@ -633,6 +633,183 @@ h1 {
   padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
 }
 
+.entry-date-picker-panel {
+  display: grid;
+  gap: 12px;
+  width: min(92vw, 360px);
+  max-width: 360px;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.single-month-calendar {
+  display: grid;
+  gap: 0;
+  border: 1px solid #e6ded1;
+  border-radius: 10px;
+  background: #fffaf2;
+  overflow: hidden;
+}
+
+.single-month-calendar-header {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) 36px;
+  align-items: center;
+  min-height: 42px;
+  border-bottom: 1px solid #efe7dc;
+  padding: 0 8px;
+}
+
+.single-month-calendar-header strong {
+  color: #27322f;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.single-month-calendar-header button {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: transparent;
+  color: #4b5652;
+}
+
+.monthly-day-calendar-header {
+  grid-template-columns: 1fr;
+}
+
+.custom-calendar-weekdays,
+.custom-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.custom-calendar-weekdays {
+  padding: 8px 8px 0;
+  color: #77807b;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.custom-calendar-grid {
+  gap: 2px 0;
+  padding: 6px 8px 8px;
+}
+
+.custom-calendar-grid button {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto auto;
+  place-items: center;
+  min-height: 46px;
+  border-radius: 8px;
+  background: transparent;
+  color: #27322f;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.custom-calendar-grid button.selected {
+  background: var(--theme-primary);
+  color: #fff;
+}
+
+.custom-calendar-grid button.calendar-holiday {
+  color: #b84438;
+}
+
+.custom-calendar-grid button.calendar-workday {
+  color: #4776b4;
+}
+
+.custom-calendar-grid button.selected.calendar-holiday,
+.custom-calendar-grid button.selected.calendar-workday {
+  color: #fff;
+}
+
+.custom-calendar-day {
+  font-size: 14px;
+}
+
+.custom-calendar-sub {
+  max-width: 100%;
+  overflow: hidden;
+  color: #77807b;
+  font-size: 10px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.custom-calendar-grid button.selected .custom-calendar-sub {
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.custom-calendar-grid button em {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 900;
+}
+
+.entry-date-recurring-button {
+  --border-radius: 10px;
+  min-height: 42px;
+  font-weight: 900;
+}
+
+.recurring-config-section {
+  display: grid;
+  gap: 10px;
+}
+
+.recurring-config-section > span {
+  color: #77807b;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.recurring-chip-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.recurring-chip-grid-weekday {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.recurring-chip-grid button {
+  min-height: 34px;
+  border-radius: 8px;
+  border: 1px solid #ded7cc;
+  background: #fffaf2;
+  color: #4b5652;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.recurring-chip-grid button.selected {
+  border-color: var(--theme-primary);
+  background: var(--theme-primary);
+  color: #fff;
+}
+
+.recurring-yearly-calendar {
+  border-radius: 10px;
+}
+
+.recurring-yearly-summary {
+  color: #4b5652;
+  font-size: 13px;
+  font-weight: 900;
+}
+
 .account-option-list {
   display: grid;
   gap: 8px;

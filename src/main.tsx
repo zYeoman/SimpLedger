@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { useLiveQuery } from "dexie-react-hooks";
-import { Button, DatePicker, Picker, Popup, TabBar } from "antd-mobile";
+import { Button, CenterPopup, DatePicker, Picker, Popup, TabBar } from "antd-mobile";
 import "antd-mobile/bundle/style.css";
 import type { Swiper as SwiperClass } from "swiper";
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -86,6 +86,8 @@ import {
   Wine,
   Wrench,
   X,
+  ChevronLeft,
+  ChevronRight,
   Zap,
 } from "lucide-react";
 import { Bar, BarChart as RechartsBarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
@@ -442,11 +444,13 @@ function App() {
   }
 
   function closeEntryPage() {
-    if (entryHistoryPushedRef.current) {
-      window.history.back();
-      return;
-    }
+    const shouldPopHistory = entryHistoryPushedRef.current;
+    isEntryOpenRef.current = false;
     animateEntryClose();
+    if (shouldPopHistory) {
+      entryHistoryPushedRef.current = false;
+      window.history.back();
+    }
   }
 
   function animateEntryClose() {
@@ -553,12 +557,14 @@ function useHistoryBackedPopup(visible: boolean, setVisible: (visible: boolean) 
   }, [setVisible, stateKey]);
 
   return () => {
-    if (pushedRef.current) {
+    const shouldPopHistory = pushedRef.current;
+    visibleRef.current = false;
+    pushedRef.current = false;
+    setVisible(false);
+    if (shouldPopHistory) {
       window.history.back();
       return;
     }
-    visibleRef.current = false;
-    setVisible(false);
   };
 }
 
@@ -589,6 +595,30 @@ type BackedDatePickerProps = Omit<React.ComponentProps<typeof DatePicker>, "visi
   historyKey: string;
 };
 
+type RecurringRuleDraft = {
+  type: TransactionType;
+  amount: string;
+  category: string;
+  account: string;
+  toAccount: string;
+  startDate: string;
+  note: string;
+};
+
+type EntryRecurringConfig = {
+  frequency: RecurringFrequency;
+  days?: number[];
+};
+
+type TymeCalendarModule = Pick<typeof import("tyme4ts"), "SolarDay">;
+
+type EntryDateActionPickerProps = {
+  label: string;
+  value: string;
+  onConfirmDate: (value: string) => void;
+  onConfirmRecurring: (config: EntryRecurringConfig) => void;
+};
+
 function BackedDatePicker({ historyKey, children, ...props }: BackedDatePickerProps) {
   const [visible, setVisible] = useState(false);
   const close = useHistoryBackedPopup(visible, setVisible, historyKey);
@@ -605,6 +635,322 @@ function BackedDatePicker({ historyKey, children, ...props }: BackedDatePickerPr
             })
         : undefined}
     </DatePicker>
+  );
+}
+
+function SingleMonthCalendar({
+  value,
+  onChange,
+  className,
+  tyme,
+}: {
+  value: Date;
+  onChange: (value: Date) => void;
+  className?: string;
+  tyme: TymeCalendarModule | null;
+}) {
+  const [monthDate, setMonthDate] = useState(() => firstDayOfMonth(value));
+
+  useEffect(() => {
+    setMonthDate(firstDayOfMonth(value));
+  }, [value.getFullYear(), value.getMonth()]);
+
+  function changeMonth(offset: number) {
+    setMonthDate((current) => {
+      const next = new Date(current);
+      next.setMonth(next.getMonth() + offset);
+      return firstDayOfMonth(next);
+    });
+  }
+
+  return (
+    <div className={`single-month-calendar ${className || ""}`.trim()}>
+      <div className="single-month-calendar-header">
+        <button type="button" aria-label="上个月" onClick={() => changeMonth(-1)}>
+          <ChevronLeft size={18} />
+        </button>
+        <strong>
+          {monthDate.getFullYear()}年{monthDate.getMonth() + 1}月
+        </strong>
+        <button type="button" aria-label="下个月" onClick={() => changeMonth(1)}>
+          <ChevronRight size={18} />
+        </button>
+      </div>
+      <CalendarMonthGrid
+        monthDate={monthDate}
+        selectedDays={isSameMonth(value, monthDate) ? [value.getDate()] : []}
+        onToggleDay={(day) => onChange(new Date(monthDate.getFullYear(), monthDate.getMonth(), day))}
+        tyme={tyme}
+      />
+    </div>
+  );
+}
+
+function YearlyDateCalendar({
+  value,
+  days,
+  onToggleDate,
+  tyme,
+}: {
+  value: Date;
+  days: number[];
+  onToggleDate: (date: Date) => void;
+  tyme: TymeCalendarModule | null;
+}) {
+  const [monthDate, setMonthDate] = useState(() => firstDayOfMonth(value));
+  const selectedDays = days
+    .filter((item) => Math.floor(item / 100) === monthDate.getMonth() + 1)
+    .map((item) => item % 100);
+
+  function changeMonth(offset: number) {
+    setMonthDate((current) => {
+      const next = new Date(current);
+      next.setMonth(next.getMonth() + offset);
+      return firstDayOfMonth(next);
+    });
+  }
+
+  return (
+    <div className="single-month-calendar recurring-yearly-calendar">
+      <div className="single-month-calendar-header">
+        <button type="button" aria-label="上个月" onClick={() => changeMonth(-1)}>
+          <ChevronLeft size={18} />
+        </button>
+        <strong>{monthDate.getMonth() + 1}月</strong>
+        <button type="button" aria-label="下个月" onClick={() => changeMonth(1)}>
+          <ChevronRight size={18} />
+        </button>
+      </div>
+      <CalendarMonthGrid monthDate={monthDate} selectedDays={selectedDays} onToggleDay={(day) => onToggleDate(new Date(monthDate.getFullYear(), monthDate.getMonth(), day))} tyme={tyme} />
+    </div>
+  );
+}
+
+function CalendarMonthGrid({
+  monthDate,
+  selectedDays,
+  onToggleDay,
+  tyme,
+}: {
+  monthDate: Date;
+  selectedDays: number[];
+  onToggleDay: (day: number) => void;
+  tyme: TymeCalendarModule | null;
+}) {
+  const leadingEmptyCells = firstDayOfMonth(monthDate).getDay();
+  const daysInMonth = lastDayOfMonth(monthDate).getDate();
+
+  return (
+    <>
+      <div className="custom-calendar-weekdays">
+        {["日", "一", "二", "三", "四", "五", "六"].map((item) => (
+          <span key={item}>{item}</span>
+        ))}
+      </div>
+      <div className="custom-calendar-grid">
+        {Array.from({ length: leadingEmptyCells }, (_, index) => (
+          <span key={`empty-${index}`} />
+        ))}
+        {Array.from({ length: daysInMonth }, (_, index) => {
+          const day = index + 1;
+          const cellInfo = getCalendarCellInfo(monthDate.getFullYear(), monthDate.getMonth() + 1, day, tyme);
+          return (
+            <button
+              type="button"
+              key={day}
+              className={[selectedDays.includes(day) ? "selected" : "", cellInfo.holidayKind ? `calendar-${cellInfo.holidayKind}` : ""].filter(Boolean).join(" ")}
+              onClick={() => onToggleDay(day)}
+            >
+              <span className="custom-calendar-day">{day}</span>
+              <span className="custom-calendar-sub">{cellInfo.label}</span>
+              {cellInfo.holidayBadge && <em>{cellInfo.holidayBadge}</em>}
+            </button>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
+function getCalendarCellInfo(year: number, month: number, day: number, tyme: TymeCalendarModule | null) {
+  if (!tyme) {
+    return {
+      label: "",
+      holidayBadge: "",
+      holidayKind: "",
+    };
+  }
+  const solarDay = tyme.SolarDay.fromYmd(year, month, day);
+  const lunarDay = solarDay.getLunarDay();
+  const termDay = solarDay.getTermDay();
+  const legalHoliday = solarDay.getLegalHoliday();
+  const holiday = legalHoliday && !legalHoliday.isWork() ? legalHoliday.getName() : null;
+  const festival = [solarDay.getFestival()?.event, lunarDay.getFestival()?.event, termDay.getDayIndex() === 0 ? termDay.getSolarTerm() : null]
+    .filter(Boolean)
+    .map(String)[0];
+  const lunarLabel = lunarDay.getName() === "初一" ? lunarDay.getLunarMonth().getName() : lunarDay.getName();
+  return {
+    label: festival || lunarLabel,
+    holidayBadge: legalHoliday ? (legalHoliday.isWork() ? "班" : "休") : "",
+    holidayKind: legalHoliday ? (legalHoliday.isWork() ? "workday" : "holiday") : "",
+  };
+}
+
+function MonthlyDayCalendar({
+  days,
+  onToggleDay,
+  tyme,
+}: {
+  days: number[];
+  onToggleDay: (day: number) => void;
+  tyme: TymeCalendarModule | null;
+}) {
+  return (
+    <div className="single-month-calendar monthly-day-calendar">
+      <div className="single-month-calendar-header monthly-day-calendar-header">
+        <strong>每月</strong>
+      </div>
+      <CalendarMonthGrid monthDate={new Date(2024, 0, 1)} selectedDays={days} onToggleDay={onToggleDay} tyme={tyme} />
+    </div>
+  );
+}
+
+function EntryDateActionPicker({ label, value, onConfirmDate, onConfirmRecurring }: EntryDateActionPickerProps) {
+  const [visible, setVisible] = useState(false);
+  const [mode, setMode] = useState<"date" | "recurring">("date");
+  const [frequency, setFrequency] = useState<RecurringFrequency>("daily");
+  const [weeklyDays, setWeeklyDays] = useState<number[]>([]);
+  const [monthlyDays, setMonthlyDays] = useState<number[]>([]);
+  const [yearlyDays, setYearlyDays] = useState<number[]>([]);
+  const [calendarTyme, setCalendarTyme] = useState<TymeCalendarModule | null>(null);
+  const close = useHistoryBackedPopup(visible, setVisible, "localMoneyEntryDateActionPicker");
+  const dateValue = new Date(`${value}T00:00:00`);
+  const currentWeekday = dateValue.getDay();
+  const currentMonthDay = dateValue.getDate();
+  const currentYearDay = toRecurringYearDay(dateValue);
+
+  useEffect(() => {
+    if (!visible) return;
+    setWeeklyDays((current) => (current.length ? current : [currentWeekday]));
+    setMonthlyDays((current) => (current.length ? current : [currentMonthDay]));
+    setYearlyDays((current) => (current.length ? current : [currentYearDay]));
+  }, [visible, currentWeekday, currentMonthDay, currentYearDay]);
+
+  useEffect(() => {
+    if (!visible || calendarTyme) return;
+    let isActive = true;
+    import("tyme4ts").then((module) => {
+      if (isActive) setCalendarTyme({ SolarDay: module.SolarDay });
+    });
+    return () => {
+      isActive = false;
+    };
+  }, [visible, calendarTyme]);
+
+  function closeAndReset() {
+    setMode("date");
+    close();
+  }
+
+  function toggleNumber(values: number[], valueToToggle: number) {
+    return values.includes(valueToToggle) ? values.filter((item) => item !== valueToToggle) : [...values, valueToToggle].sort((a, b) => a - b);
+  }
+
+  function recurringConfigForSubmit(): EntryRecurringConfig {
+    if (frequency === "weekly") return { frequency, days: weeklyDays.length ? weeklyDays : [currentWeekday] };
+    if (frequency === "monthly") return { frequency, days: monthlyDays.length ? monthlyDays : [currentMonthDay] };
+    if (frequency === "yearly") return { frequency, days: yearlyDays.length ? yearlyDays : [currentYearDay] };
+    return { frequency };
+  }
+
+  return (
+    <>
+      <Button className="choice-button" color="primary" fill="solid" onClick={() => setVisible(true)}>
+        {label}
+      </Button>
+      <CenterPopup
+        visible={visible}
+        onMaskClick={closeAndReset}
+        style={{ "--max-width": "360px", "--min-width": "min(92vw, 360px)", "--border-radius": "16px", "--background-color": "#f7f3ec" } as React.CSSProperties}
+      >
+        <div className="entry-date-picker-panel">
+          <div className="popup-title">{mode === "date" ? "选择日期" : "周期记账"}</div>
+          {mode === "date" ? (
+            <>
+              <SingleMonthCalendar
+                value={dateValue}
+                tyme={calendarTyme}
+                onChange={(next) => {
+                  onConfirmDate(toDateInputValue(next));
+                  closeAndReset();
+                }}
+              />
+              <Button className="entry-date-recurring-button" color="primary" fill="outline" onClick={() => setMode("recurring")}>
+                周期记账
+              </Button>
+            </>
+          ) : (
+            <>
+              <div className="segmented compact-segmented recurring-quick-segmented">
+                {(["daily", "weekday", "weekend", "weekly", "monthly", "yearly"] as RecurringFrequency[]).map((item) => (
+                  <button type="button" key={item} className={frequency === item ? "selected" : ""} onClick={() => setFrequency(item)}>
+                    {recurringFrequencyLabel[item]}
+                  </button>
+                ))}
+              </div>
+              {frequency === "weekly" && (
+                <div className="recurring-config-section">
+                  <span>每周哪几天</span>
+                  <div className="recurring-chip-grid recurring-chip-grid-weekday">
+                    {["周日", "周一", "周二", "周三", "周四", "周五", "周六"].map((item, index) => (
+                      <button type="button" key={item} className={weeklyDays.includes(index) ? "selected" : ""} onClick={() => setWeeklyDays((current) => toggleNumber(current, index))}>
+                        {item}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {frequency === "monthly" && (
+                <div className="recurring-config-section">
+                  <span>每月哪几号</span>
+                  <MonthlyDayCalendar days={monthlyDays} onToggleDay={(day) => setMonthlyDays((current) => toggleNumber(current, day))} tyme={calendarTyme} />
+                </div>
+              )}
+              {frequency === "yearly" && (
+                <div className="recurring-config-section">
+                  <span>每年日期</span>
+                  <YearlyDateCalendar
+                    value={dateValue}
+                    days={yearlyDays}
+                    tyme={calendarTyme}
+                    onToggleDate={(next) => setYearlyDays((current) => toggleNumber(current, toRecurringYearDay(next)))}
+                  />
+                  <div className="recurring-yearly-summary">{formatRecurringConfigSummary({ frequency, days: yearlyDays.length ? yearlyDays : [currentYearDay] })}</div>
+                </div>
+              )}
+              <div className="recurring-action-row">
+                <Button block fill="outline" type="button" className="recurring-cancel-button" onClick={() => setMode("date")}>
+                  返回
+                </Button>
+                <Button
+                  block
+                  color="primary"
+                  fill="solid"
+                  type="button"
+                  className="recurring-submit-button"
+                  onClick={() => {
+                    onConfirmRecurring(recurringConfigForSubmit());
+                    closeAndReset();
+                  }}
+                >
+                  保存
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+      </CenterPopup>
+    </>
   );
 }
 
@@ -1139,6 +1485,7 @@ function EntryForm({
   const [toAccount, setToAccount] = useState(transaction?.toAccount ?? accountNames.find((item) => item !== (transaction?.account ?? accountNames[0])) ?? accountNames[0]);
   const [date, setDate] = useState(transaction?.date ?? todayInputValue());
   const [note, setNote] = useState(transaction?.note ?? "");
+  const [entryRecurringConfig, setEntryRecurringConfig] = useState<EntryRecurringConfig | null>(null);
 
   useEffect(() => {
     if (type === "transfer") return;
@@ -1166,6 +1513,21 @@ function EntryForm({
     event.preventDefault();
     if (/[+-]/.test(amount)) {
       calculateAmountInPlace();
+      return;
+    }
+    if (entryRecurringConfig) {
+      const saved = await createRecurringRuleFromEntryDraft({
+        type,
+        amount,
+        category,
+        account,
+        toAccount,
+        date,
+        note,
+        frequency: entryRecurringConfig.frequency,
+        days: entryRecurringConfig.days,
+      });
+      if (saved) onDone();
       return;
     }
     const value = evaluateAmountExpression(amount);
@@ -1242,7 +1604,8 @@ function EntryForm({
     }
   }
 
-  const dateLabel = formatEntryDateLabel(date);
+  const entryRecurringSummary = entryRecurringConfig ? formatRecurringConfigSummary(entryRecurringConfig) : "";
+  const dateLabel = entryRecurringSummary || formatEntryDateLabel(date);
   const dateValue = new Date(`${date}T00:00:00`);
   const hasAmountExpression = /[+-]/.test(amount);
 
@@ -1309,13 +1672,15 @@ function EntryForm({
         <div className="entry-meta-grid">
           <div className="meta-left">
             <div className="choice-wrap">
-              <BackedDatePicker historyKey="localMoneyEntryDatePicker" title="选择日期" value={dateValue} onConfirm={(value) => setDate(toDateInputValue(value))}>
-                {(_, actions) => (
-                  <Button className="choice-button" color="primary" fill="solid" onClick={actions.open}>
-                    {dateLabel}
-                  </Button>
-                )}
-              </BackedDatePicker>
+              <EntryDateActionPicker
+                label={dateLabel}
+                value={date}
+                onConfirmDate={(nextDate) => {
+                  setDate(nextDate);
+                  setEntryRecurringConfig(null);
+                }}
+                onConfirmRecurring={setEntryRecurringConfig}
+              />
             </div>
             {type !== "transfer" && (
               <div className="choice-wrap">
@@ -1407,11 +1772,57 @@ function evaluateAmountExpression(expression: string) {
   return Number.isFinite(total) ? Math.round(total * 100) / 100 : 0;
 }
 
+async function createRecurringRuleFromEntryDraft(draft: {
+  type: TransactionType;
+  amount: string;
+  category: string;
+  account: string;
+  toAccount: string;
+  date: string;
+  note: string;
+  frequency: RecurringFrequency;
+  days?: number[];
+}) {
+  const value = evaluateAmountExpression(draft.amount);
+  const today = todayInputValue();
+  if (!value || value <= 0 || !draft.account || !draft.date) return false;
+  if (draft.type !== "transfer" && !draft.category) return false;
+  if (draft.type === "transfer" && (!draft.toAccount || draft.account === draft.toAccount)) return false;
+  await db.transferRules.add({
+    type: draft.type,
+    category: draft.type === "transfer" ? "转账" : draft.category,
+    account: draft.account,
+    toAccount: draft.type === "transfer" ? draft.toAccount : undefined,
+    amount: Math.round(value * 100) / 100,
+    frequency: draft.frequency,
+    days: draft.days?.length ? draft.days : undefined,
+    startDate: draft.date,
+    lastRunDate: draft.date <= today ? today : undefined,
+    note: draft.note.trim() || "周期记账",
+    enabled: true,
+    createdAt: new Date().toISOString(),
+  });
+  await applyAutoTransfers();
+  return true;
+}
+
 function toDateInputValue(value: Date) {
   const year = value.getFullYear();
   const month = String(value.getMonth() + 1).padStart(2, "0");
   const day = String(value.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function firstDayOfMonth(value: Date) {
+  return new Date(value.getFullYear(), value.getMonth(), 1);
+}
+
+function lastDayOfMonth(value: Date) {
+  return new Date(value.getFullYear(), value.getMonth() + 1, 0);
+}
+
+function isSameMonth(left: Date, right: Date) {
+  return left.getFullYear() === right.getFullYear() && left.getMonth() === right.getMonth();
 }
 
 function formatEntryDateLabel(value: string) {
@@ -1422,6 +1833,19 @@ function formatEntryDateLabel(value: string) {
   const day = String(date.getDate()).padStart(2, "0");
   if (date.getFullYear() === currentYear) return `${month}/${day}`;
   return `${date.getFullYear()}/${month}/${day}`;
+}
+
+function toRecurringYearDay(value: Date) {
+  return Number(`${String(value.getMonth() + 1).padStart(2, "0")}${String(value.getDate()).padStart(2, "0")}`);
+}
+
+function formatRecurringConfigSummary(config: EntryRecurringConfig) {
+  const rule = {
+    frequency: config.frequency,
+    days: config.days,
+  } as TransferRule;
+  const dayText = formatRecurringDays(rule);
+  return [recurringFrequencyLabel[config.frequency], dayText].filter(Boolean).join(" ");
 }
 
 function useCategories() {
@@ -2833,25 +3257,27 @@ function RecurringRulesPanel({
 function RecurringRuleEditor({
   accounts,
   categories,
+  initialDraft,
   onDone,
 }: {
   accounts: Account[];
   categories: ReturnType<typeof useCategories>;
+  initialDraft?: RecurringRuleDraft;
   onDone: () => void;
 }) {
   const accountNames = accounts.length ? accounts.map((item) => item.name) : defaultAccounts;
-  const [type, setType] = useState<TransactionType>("expense");
+  const [type, setType] = useState<TransactionType>(initialDraft?.type ?? "expense");
   const typeCategories = categories.filter((category) => category.type === type);
-  const initialCategory = typeCategories[0]?.name ?? "";
+  const initialCategory = initialDraft?.category && typeCategories.some((item) => item.name === initialDraft.category) ? initialDraft.category : typeCategories[0]?.name ?? "";
   const [category, setCategory] = useState(initialCategory);
-  const [account, setAccount] = useState(defaultAccountForCategory(typeCategories, initialCategory, accountNames) ?? accountNames[0] ?? "");
-  const [toAccount, setToAccount] = useState(accountNames.find((item) => item !== (accountNames[0] ?? "")) ?? accountNames[0] ?? "");
-  const [amount, setAmount] = useState("");
+  const [account, setAccount] = useState(initialDraft?.account || (defaultAccountForCategory(typeCategories, initialCategory, accountNames) ?? accountNames[0] ?? ""));
+  const [toAccount, setToAccount] = useState(initialDraft?.toAccount || (accountNames.find((item) => item !== (initialDraft?.account || (accountNames[0] ?? ""))) ?? accountNames[0] ?? ""));
+  const [amount, setAmount] = useState(initialDraft?.amount ?? "");
   const [frequency, setFrequency] = useState<RecurringFrequency>("daily");
   const [daysText, setDaysText] = useState("");
-  const [startDate, setStartDate] = useState(todayInputValue());
+  const [startDate, setStartDate] = useState(initialDraft?.startDate ?? todayInputValue());
   const [endDate, setEndDate] = useState("");
-  const [note, setNote] = useState("");
+  const [note, setNote] = useState(initialDraft?.note ?? "");
   const categoryColumns = [typeCategories.map((item) => ({ label: item.name, value: item.name }))];
   const accountColumns = [accountNames.map((name) => ({ label: name, value: name }))];
   const frequencyColumns = [Object.entries(recurringFrequencyLabel).map(([value, label]) => ({ label, value }))];
