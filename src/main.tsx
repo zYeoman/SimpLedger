@@ -1104,8 +1104,8 @@ function TodayAlmanacHeader({
         const currentHour = lunarDay.getHours()[now.getHours() === 23 ? 12 : Math.floor((now.getHours() + 1) / 2)];
         const hourPillar = currentHour ? String(currentHour.getSixtyCycle()) : "";
         const festival = [
-          solarDay.getFestival(),
-          lunarDay.getFestival(),
+          solarDay.getFestival()?.event,
+          lunarDay.getFestival()?.event,
           termDay.getDayIndex() === 0 ? termDay.getSolarTerm() : null,
         ]
           .filter(Boolean)
@@ -1208,6 +1208,9 @@ function buildFallbackTodayAlmanac(): TodayAlmanac {
 }
 
 function findNextLegalHolidayLabel(now: Date, LegalHoliday: typeof import("tyme4ts").LegalHoliday) {
+  const todayHoliday = LegalHoliday.fromYmd(now.getFullYear(), now.getMonth() + 1, now.getDate());
+  if (todayHoliday && !todayHoliday.isWork()) return "";
+
   for (let offset = 1; offset <= 370; offset += 1) {
     const candidate = new Date(now);
     candidate.setDate(now.getDate() + offset);
