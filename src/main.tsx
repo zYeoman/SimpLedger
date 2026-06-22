@@ -785,7 +785,7 @@ function getCalendarCellInfo(year: number, month: number, day: number, tyme: Tym
   const termDay = solarDay.getTermDay();
   const legalHoliday = solarDay.getLegalHoliday();
   const holiday = legalHoliday && !legalHoliday.isWork() ? legalHoliday.getName() : null;
-  const festival = [solarDay.getFestival()?.event, lunarDay.getFestival()?.event, termDay.getDayIndex() === 0 ? termDay.getSolarTerm() : null]
+  const festival = [solarDay.getFestival()?.getName(), lunarDay.getFestival()?.getName(), termDay.getDayIndex() === 0 ? termDay.getSolarTerm() : null]
     .filter(Boolean)
     .map(String)[0];
   const lunarLabel = lunarDay.getName() === "初一" ? lunarDay.getLunarMonth().getName() : lunarDay.getName();
@@ -1104,8 +1104,8 @@ function TodayAlmanacHeader({
         const currentHour = lunarDay.getHours()[now.getHours() === 23 ? 12 : Math.floor((now.getHours() + 1) / 2)];
         const hourPillar = currentHour ? String(currentHour.getSixtyCycle()) : "";
         const festival = [
-          solarDay.getFestival()?.event,
-          lunarDay.getFestival()?.event,
+          solarDay.getFestival()?.getName(),
+          lunarDay.getFestival()?.getName(),
           termDay.getDayIndex() === 0 ? termDay.getSolarTerm() : null,
         ]
           .filter(Boolean)
