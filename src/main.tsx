@@ -954,48 +954,43 @@ function EntryDateActionPicker({ label, value, onConfirmDate, onConfirmRecurring
   );
 }
 
-function AccountSelectButton({
+function AccountSelectButton({ value, accounts, onChange, className }: { value: string; accounts: string[]; onChange: (value: string) => void; className: string }) {
+  function switchToNextAccount() {
+    if (!accounts.length) return;
+    const currentIndex = accounts.indexOf(value);
+    const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % accounts.length : 0;
+    onChange(accounts[nextIndex]);
+  }
+
+  return (
+    <Button className={className} color="primary" fill="solid" onClick={switchToNextAccount}>
+      {value || "选择账户"}
+    </Button>
+  );
+}
+
+function TransferAccountSelect({
   label,
   value,
   accounts,
   onChange,
-  className,
-  historyKey,
 }: {
-  label?: string;
+  label: string;
   value: string;
   accounts: string[];
   onChange: (value: string) => void;
-  className: string;
-  historyKey: string;
 }) {
-  const [visible, setVisible] = useState(false);
-  const close = useHistoryBackedPopup(visible, setVisible, historyKey);
-
   return (
-    <>
-      <Button className={className} color="primary" fill="solid" onClick={() => setVisible(true)}>
-        {[label, value || "选择账户"].filter(Boolean).join(" ")}
-      </Button>
-      <Popup visible={visible} onMaskClick={close} bodyClassName="account-select-popup">
-        <div className="popup-title">{label || "选择账户"}</div>
-        <div className="account-option-list">
-          {accounts.map((account) => (
-            <button
-              type="button"
-              key={account}
-              className={value === account ? "selected" : ""}
-              onClick={() => {
-                onChange(account);
-                close();
-              }}
-            >
-              {account}
-            </button>
-          ))}
-        </div>
-      </Popup>
-    </>
+    <div className="transfer-account-select">
+      <span>{label}</span>
+      <div className="transfer-account-options">
+        {accounts.map((account) => (
+          <button type="button" key={account} className={value === account ? "selected" : ""} onClick={() => onChange(account)}>
+            {account}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -1635,21 +1630,17 @@ function EntryForm({
 
       {type === "transfer" ? (
         <div className="transfer-account-grid">
-          <AccountSelectButton
+          <TransferAccountSelect
             label="转出"
             value={account}
             accounts={accountNames}
             onChange={setAccount}
-            className="transfer-account-button"
-            historyKey="localMoneyEntryTransferFromAccountPopup"
           />
-          <AccountSelectButton
+          <TransferAccountSelect
             label="转入"
             value={toAccount}
             accounts={accountNames}
             onChange={setToAccount}
-            className="transfer-account-button"
-            historyKey="localMoneyEntryTransferToAccountPopup"
           />
         </div>
       ) : (
@@ -1692,7 +1683,6 @@ function EntryForm({
                   accounts={accountNames}
                   onChange={setAccount}
                   className="choice-button"
-                  historyKey="localMoneyEntryAccountPopup"
                 />
               </div>
             )}
@@ -3282,7 +3272,6 @@ function RecurringRuleEditor({
   const [endDate, setEndDate] = useState("");
   const [note, setNote] = useState(initialDraft?.note ?? "");
   const categoryColumns = [typeCategories.map((item) => ({ label: item.name, value: item.name }))];
-  const accountColumns = [accountNames.map((name) => ({ label: name, value: name }))];
   const frequencyColumns = [Object.entries(recurringFrequencyLabel).map(([value, label]) => ({ label, value }))];
   const startDateValue = new Date(`${startDate}T00:00:00`);
   const endDateValue = new Date(`${endDate || startDate}T00:00:00`);
@@ -3369,21 +3358,13 @@ function RecurringRuleEditor({
               )}
             </BackedPicker>
           )}
-          <BackedPicker historyKey="localMoneyRecurringAccountPicker" columns={accountColumns} value={[account]} onConfirm={(value) => setAccount(String(value[0]))}>
-            {(_, actions) => (
-              <Button className="recurring-choice-button" color="primary" fill="solid" onClick={actions.open}>
-                {type === "transfer" ? `转出 ${account}` : account || "选择账户"}
-              </Button>
-            )}
-          </BackedPicker>
+          {type === "transfer" ? (
+            <TransferAccountSelect label="转出" value={account} accounts={accountNames} onChange={setAccount} />
+          ) : (
+            <AccountSelectButton value={account} accounts={accountNames} onChange={setAccount} className="recurring-choice-button" />
+          )}
           {type === "transfer" && (
-            <BackedPicker historyKey="localMoneyRecurringToAccountPicker" columns={accountColumns} value={[toAccount]} onConfirm={(value) => setToAccount(String(value[0]))}>
-              {(_, actions) => (
-                <Button className="recurring-choice-button" color="primary" fill="solid" onClick={actions.open}>
-                  转入 {toAccount || "选择账户"}
-                </Button>
-              )}
-            </BackedPicker>
+            <TransferAccountSelect label="转入" value={toAccount} accounts={accountNames} onChange={setToAccount} />
           )}
         </div>
         <div className="recurring-field">
