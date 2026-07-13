@@ -10,6 +10,7 @@
 - 分类自定义：名称、颜色、图标
 - 周期记账：支持收入、支出、转账，以及每天、工作日、休息日、每周、每月、每年重复
 - JSON 备份导入/导出
+- WebDAV 和 Cloudflare R2 备份/恢复
 - Elephant Bookkeeping 数据转换脚本
 - PWA 安装到主屏幕和离线缓存
 
@@ -86,8 +87,41 @@ Vercel 设置保持 Vite 默认即可：
 
 - 导出 JSON
 - 导入 JSON
+- 备份到 WebDAV / 从 WebDAV 恢复
+- 备份到 Cloudflare / 从 Cloudflare 恢复
 
 导入会替换当前本地数据库中的账目、分类、账户和周期记账规则。
+
+### Cloudflare R2 备份
+
+Cloudflare 备份通过 Worker 代理访问 R2，避免把 R2 Access Key 暴露在浏览器里。
+
+1. 在 Cloudflare 创建 R2 bucket，例如 `local-money-backup`。
+2. 复制 `cloudflare/wrangler.example.toml` 为 `cloudflare/wrangler.toml`。
+3. 在 `cloudflare/wrangler.toml` 中确认 `bucket_name` 和 Worker 名称。
+4. 设置备份令牌：
+
+```bash
+cd cloudflare
+wrangler secret put BACKUP_TOKEN
+```
+
+5. 部署 Worker：
+
+```bash
+cd cloudflare
+wrangler deploy
+```
+
+6. 在 App 设置页填写：
+
+- Worker 地址，例如 `https://local-money-backup.example.workers.dev`
+- 备份令牌，即 `BACKUP_TOKEN`
+
+Worker 会在 R2 中保存：
+
+- `local-money-latest.json`
+- `history/local-money-YYYYMMDDHHmmss.json`
 
 ## Elephant 数据转换
 

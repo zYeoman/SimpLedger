@@ -112,6 +112,14 @@ import {
 } from "./db";
 import { currency, fileSafeStamp, getMonthRange, groupByDate, monthKey, sumByType, todayInputValue } from "./utils";
 import {
+  downloadLatestCloudflareBackup,
+  loadCloudflareBackupConfig,
+  saveCloudflareBackupConfig,
+  shouldRunAutoCloudflareBackup,
+  uploadCloudflareBackup,
+  type CloudflareBackupConfig,
+} from "./cloudflare";
+import {
   downloadLatestWebdavBackup,
   loadWebdavConfig,
   saveWebdavConfig,
@@ -170,6 +178,7 @@ function App() {
   const isEntryOpenRef = useRef(false);
   const entryHistoryPushedRef = useRef(false);
   const autoWebdavBackupStartedRef = useRef(false);
+  const autoCloudflareBackupStartedRef = useRef(false);
   const [statsMode, setStatsMode] = useState<StatsMode>("month");
   const [statsMonth, setStatsMonth] = useState(monthKey());
   const [statsYear, setStatsYear] = useState(String(new Date().getFullYear()));
@@ -228,6 +237,22 @@ function App() {
       })
       .catch(() => {
         autoWebdavBackupStartedRef.current = false;
+      });
+  }, [isDataReady]);
+
+  useEffect(() => {
+    if (!isDataReady || autoCloudflareBackupStartedRef.current) return;
+    const config = loadCloudflareBackupConfig();
+    const today = todayInputValue();
+    if (!shouldRunAutoCloudflareBackup(config, today)) return;
+    autoCloudflareBackupStartedRef.current = true;
+    exportBackup()
+      .then((payload) => uploadCloudflareBackup(config, payload))
+      .then(() => {
+        saveCloudflareBackupConfig({ ...config, lastAutoBackupDate: today });
+      })
+      .catch(() => {
+        autoCloudflareBackupStartedRef.current = false;
       });
   }, [isDataReady]);
 
@@ -2883,6 +2908,9 @@ function SettingsView({
   const [webdavStatus, setWebdavStatus] = useState("");
   const [webdavConfig, setWebdavConfig] = useState<WebdavConfig>(loadWebdavConfig);
   const [isWebdavSettingsOpen, setIsWebdavSettingsOpen] = useState(false);
+  const [cloudflareStatus, setCloudflareStatus] = useState("");
+  const [cloudflareConfig, setCloudflareConfig] = useState<CloudflareBackupConfig>(loadCloudflareBackupConfig);
+  const [isCloudflareSettingsOpen, setIsCloudflareSettingsOpen] = useState(false);
   const [isAccountSettingsOpen, setIsAccountSettingsOpen] = useState(false);
   const [isTransferRulesOpen, setIsTransferRulesOpen] = useState(false);
   const [isCategorySettingsOpen, setIsCategorySettingsOpen] = useState(false);
@@ -2895,8 +2923,19 @@ function SettingsView({
   }, [webdavConfig]);
 
   useEffect(() => {
+    saveCloudflareBackupConfig(cloudflareConfig);
+  }, [cloudflareConfig]);
+
+  useEffect(() => {
     window.requestAnimationFrame(() => window.dispatchEvent(new Event("localMoneyLayoutChange")));
-  }, [isWebdavSettingsOpen, webdavStatus, webdavConfig.lastAutoBackupDate]);
+  }, [
+    isWebdavSettingsOpen,
+    webdavStatus,
+    webdavConfig.lastAutoBackupDate,
+    isCloudflareSettingsOpen,
+    cloudflareStatus,
+    cloudflareConfig.lastAutoBackupDate,
+  ]);
 
   async function downloadBackup() {
     const payload = await exportBackup();
@@ -2939,6 +2978,32 @@ function SettingsView({
       setWebdavStatus("WebDAV 恢复完成");
     } catch (error) {
       setWebdavStatus(error instanceof Error ? error.message : "WebDAV 恢复失败");
+    }
+  }
+
+  async function backupToCloudflare() {
+    try {
+      setCloudflareStatus("正在备份到 Cloudflare...");
+      const payload = await exportBackup();
+      await uploadCloudflareBackup(cloudflareConfig, payload);
+      const nextConfig = { ...cloudflareConfig, lastAutoBackupDate: todayInputValue() };
+      setCloudflareConfig(nextConfig);
+      saveCloudflareBackupConfig(nextConfig);
+      setCloudflareStatus("Cloudflare 备份完成");
+    } catch (error) {
+      setCloudflareStatus(error instanceof Error ? error.message : "Cloudflare 备份失败");
+    }
+  }
+
+  async function restoreFromCloudflare() {
+    if (!window.confirm("从 Cloudflare 恢复会覆盖当前本地数据，确定继续吗？")) return;
+    try {
+      setCloudflareStatus("正在从 Cloudflare 恢复...");
+      const payload = await downloadLatestCloudflareBackup(cloudflareConfig);
+      await importBackup(payload);
+      setCloudflareStatus("Cloudflare 恢复完成");
+    } catch (error) {
+      setCloudflareStatus(error instanceof Error ? error.message : "Cloudflare 恢复失败");
     }
   }
 
@@ -3063,6 +3128,58 @@ function SettingsView({
         )}
         {webdavConfig.lastAutoBackupDate && <p className="setting-hint">上次自动备份：{webdavConfig.lastAutoBackupDate}</p>}
         {webdavStatus && <p className="setting-hint">{webdavStatus}</p>}
+        <div className="button-row webdav-action-row">
+          <button className="secondary-button" onClick={backupToCloudflare}>
+            <Upload size={18} />
+            备份到 Cloudflare
+          </button>
+          <button className="secondary-button" onClick={restoreFromCloudflare}>
+            <Download size={18} />
+            从 Cloudflare 恢复
+          </button>
+        </div>
+        <button
+          type="button"
+          className={`settings-action-button webdav-config-button ${isCloudflareSettingsOpen ? "open" : ""}`}
+          onClick={() => setIsCloudflareSettingsOpen((current) => !current)}
+        >
+          <Settings size={18} />
+          <span>Cloudflare 设置</span>
+          <em>{`${cloudflareConfig.endpoint.trim() && cloudflareConfig.token.trim() ? "已配置" : "未配置"} · ${
+            cloudflareConfig.autoBackup ? "自动备份" : "手动备份"
+          }`}</em>
+        </button>
+        {isCloudflareSettingsOpen && (
+          <div className="webdav-settings">
+            <label className="field webdav-field">
+              <span>Worker 地址</span>
+              <input
+                placeholder="https://local-money-backup.example.workers.dev"
+                value={cloudflareConfig.endpoint}
+                onChange={(event) => setCloudflareConfig((current) => ({ ...current, endpoint: event.target.value }))}
+              />
+            </label>
+            <label className="field webdav-field">
+              <span>备份令牌</span>
+              <input
+                type="password"
+                autoComplete="current-password"
+                value={cloudflareConfig.token}
+                onChange={(event) => setCloudflareConfig((current) => ({ ...current, token: event.target.value }))}
+              />
+            </label>
+            <label className="webdav-toggle">
+              <input
+                type="checkbox"
+                checked={cloudflareConfig.autoBackup}
+                onChange={(event) => setCloudflareConfig((current) => ({ ...current, autoBackup: event.target.checked }))}
+              />
+              <span>每天首次打开自动备份</span>
+            </label>
+          </div>
+        )}
+        {cloudflareConfig.lastAutoBackupDate && <p className="setting-hint">Cloudflare 上次自动备份：{cloudflareConfig.lastAutoBackupDate}</p>}
+        {cloudflareStatus && <p className="setting-hint">{cloudflareStatus}</p>}
       </div>
       <div className="panel">
         <div className="section-title">

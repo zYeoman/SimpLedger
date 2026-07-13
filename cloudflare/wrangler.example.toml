@@ -1,0 +1,14 @@
+name = "local-money-backup"
+main = "backup-worker.js"
+compatibility_date = "2026-07-13"
+
+[[r2_buckets]]
+binding = "BACKUP_BUCKET"
+bucket_name = "local-money-backup"
+
+# Set secrets with:
+# wrangler secret put BACKUP_TOKEN
+#
+# Optional: restrict CORS to your app origin.
+# [vars]
+# ALLOWED_ORIGIN = "https://your-app.example.com"
