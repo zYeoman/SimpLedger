@@ -261,7 +261,8 @@ function App() {
       if (canGoBack || hasAppState) {
         window.history.back();
       } else {
-        CapacitorApp.exitApp();
+        // 首页无状态时退到后台而不是销毁 Activity，和按主页键一致，重开不会重新加载
+        CapacitorApp.minimizeApp();
       }
     });
   }, []);
