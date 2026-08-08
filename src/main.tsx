@@ -231,6 +231,8 @@ function App() {
   const [isAiChatOpen, setIsAiChatOpen] = useState(false);
   const isAiChatOpenRef = useRef(false);
   const aiChatHistoryPushedRef = useRef(false);
+  const fabLongPressTimerRef = useRef<number | undefined>(undefined);
+  const fabSuppressClickRef = useRef(false);
   const autoWebdavBackupStartedRef = useRef(false);
   const autoCloudflareBackupStartedRef = useRef(false);
   const [statsMode, setStatsMode] = useState<StatsMode>("month");
@@ -493,7 +495,23 @@ function App() {
           <TabBar.Item key="stats" icon={<BarChart3 size={20} />} title="统计" />
           <TabBar.Item key="settings" icon={<Settings size={20} />} title="设置" />
         </TabBar>
-        <button className="add-fab" aria-label="记一笔" disabled={!isDataReady} onClick={() => openEntryPage()}>
+        <button
+          className="add-fab"
+          aria-label="记一笔（长按打开 AI 统计）"
+          disabled={!isDataReady}
+          onClick={() => {
+            if (fabSuppressClickRef.current) {
+              fabSuppressClickRef.current = false;
+              return;
+            }
+            openEntryPage();
+          }}
+          onPointerDown={startFabLongPress}
+          onPointerUp={clearFabLongPress}
+          onPointerLeave={clearFabLongPress}
+          onPointerCancel={clearFabLongPress}
+          onContextMenu={(event) => event.preventDefault()}
+        >
           <Plus size={26} />
         </button>
       </nav>
@@ -526,6 +544,22 @@ function App() {
     if (shouldPopHistory) {
       window.history.back();
     }
+  }
+
+  function clearFabLongPress() {
+    if (fabLongPressTimerRef.current !== undefined) {
+      window.clearTimeout(fabLongPressTimerRef.current);
+      fabLongPressTimerRef.current = undefined;
+    }
+  }
+
+  function startFabLongPress() {
+    clearFabLongPress();
+    fabLongPressTimerRef.current = window.setTimeout(() => {
+      fabLongPressTimerRef.current = undefined;
+      fabSuppressClickRef.current = true;
+      openAiChat();
+    }, 500);
   }
 
   function navigateView(nextView: View) {
