@@ -300,6 +300,9 @@ function parseTerm(token: string, categoryNames: string[]): Ast | { error: strin
       return { kind: "field", field: "amount", op, value: rawValue };
     }
     if (fieldName === "日期" || fieldName === "date") {
+      // 支持 日期:最近一年 / 日期:本月 这类写法
+      const aliasExpanded = expandRelativeDateToken(rawValue);
+      if (aliasExpanded) return aliasExpanded;
       const rangeParts = rawValue.split("..");
       if (rangeParts.length === 2) {
         return {
