@@ -27,6 +27,8 @@ public class MainActivity extends BridgeActivity {
      */
     private void makeKeyboardOverlay() {
         getBridge().getWebView().post(() -> {
+            // 关闭 WebView 原生过滚动效果（Android 12+ 整页拉伸 + 边缘光晕）
+            getBridge().getWebView().setOverScrollMode(View.OVER_SCROLL_NEVER);
             View parent = (View) getBridge().getWebView().getParent();
             ViewCompat.setOnApplyWindowInsetsListener(parent, (view, insets) -> {
                 view.setPadding(0, 0, 0, 0);

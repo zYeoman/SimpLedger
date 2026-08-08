@@ -37,6 +37,11 @@ body {
   pointer-events: none;
 }
 
+/* App（native）模式下关闭根滚动容器的过滚动链式效果，与 MainActivity 的原生设置配合 */
+.native-shell {
+  overscroll-behavior: none;
+}
+
 button,
 input,
 select {
