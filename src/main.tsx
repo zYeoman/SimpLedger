@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { useLiveQuery } from "dexie-react-hooks";
+import { App as CapacitorApp } from "@capacitor/app";
 import { Button, CenterPopup, DatePicker, Picker, Popup, TabBar } from "antd-mobile";
 import "antd-mobile/bundle/style.css";
 import type { Swiper as SwiperClass } from "swiper";
@@ -247,6 +248,21 @@ function App() {
     return () => {
       isActive = false;
     };
+  }, []);
+
+  useEffect(() => {
+    if (!__CAPACITOR__) return;
+    // 安卓返回键：有应用内状态（弹层/记一笔页/非首页）时回退一页，
+    // 让现有 popstate 逻辑处理；在首页且无状态时才退出到桌面。
+    CapacitorApp.addListener("backButton", ({ canGoBack }) => {
+      const hasAppState =
+        isEntryOpenRef.current || viewRef.current !== "home" || activeHistoryPopupTokens.size > 0;
+      if (canGoBack || hasAppState) {
+        window.history.back();
+      } else {
+        CapacitorApp.exitApp();
+      }
+    });
   }, []);
 
   useEffect(() => {
