@@ -1649,6 +1649,14 @@ function AiOutcomeView({ outcome }: { outcome: QueryOutcome }) {
     );
   }
 
+  if (outcome.kind === "arithmetic") {
+    return (
+      <div className="ai-outcome-big">
+        {currency.format(outcome.value)}
+      </div>
+    );
+  }
+
   if (outcome.kind === "count") {
     return (
       <div className="ai-outcome-big">
@@ -1698,6 +1706,8 @@ function savedQueryOutcomeSummary(outcome: QueryOutcome): string {
       return outcome.transaction ? currency.format(outcome.transaction.amount) : "无记录";
     case "sum":
       return currency.format(outcome.amount);
+    case "arithmetic":
+      return currency.format(outcome.value);
     case "average":
       return `平均 ${currency.format(outcome.amount)}`;
     case "count":

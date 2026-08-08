@@ -37,6 +37,7 @@ export type QueryResult =
       operation?: QueryOperation;
       limit?: number;
       having?: HavingFilter;
+      arithmetic?: ArithmeticOp[];
     };
 
 export type QueryOperation =
@@ -48,6 +49,8 @@ export type QueryOperation =
   | { kind: "top-month"; type: "expense" | "income" }
   | { kind: "count"; type?: "expense" | "income" };
 
+export type ArithmeticOp = { op: "+" | "-" | "*" | "/"; value: number };
+
 export type HavingFilter = { op: "gt" | "gte" | "lt" | "lte" | "eq"; value: number };
 
 export type QueryOutcome =
@@ -57,7 +60,8 @@ export type QueryOutcome =
   | { kind: "average"; amount: number; count: number }
   | { kind: "group"; groups: { key: string; amount: number; count: number }[] }
   | { kind: "top-month"; key: string; amount: number; count: number }
-  | { kind: "count"; count: number };
+  | { kind: "count"; count: number }
+  | { kind: "arithmetic"; value: number };
 
 const TYPE_WORDS: Record<string, string> = {
   支出: "expense",
@@ -389,8 +393,19 @@ export function parseQuery(input: string, categoryNames: string[] = []): QueryRe
   let operation: QueryOperation | undefined;
   let limit: number | undefined;
   let having: HavingFilter | undefined;
+  const arithmetic: ArithmeticOp[] = [];
   const operationTokenIndexes = new Set<number>();
   for (let index = 0; index < tokens.length; index++) {
+    if (["+", "-", "*", "/"].includes(tokens[index])) {
+      const valueToken = tokens[index + 1];
+      if (valueToken === undefined || !/^\d+(\.\d+)?$/.test(valueToken)) {
+        return { error: `“${tokens[index]}”后面需要数字，例如 合计:支出 / 12` };
+      }
+      arithmetic.push({ op: tokens[index] as ArithmeticOp["op"], value: Number(valueToken) });
+      operationTokenIndexes.add(index);
+      operationTokenIndexes.add(index + 1);
+      continue;
+    }
     const limitMatch = /^limit:(\d+)$/i.exec(tokens[index]);
     if (limitMatch) {
       if (limit !== undefined) return { error: "limit 只能出现一次" };
@@ -541,7 +556,7 @@ export function parseQuery(input: string, categoryNames: string[] = []): QueryRe
   }
 
   const predicate = (transaction: QueryTransaction) => (ast ? matches(ast, transaction) : true);
-  return { predicate, hasDateConstraint: hasDateConstraint(ast), operation, limit, having };
+  return { predicate, hasDateConstraint: hasDateConstraint(ast), operation, limit, having, arithmetic };
 }
 
 export function executeQuery(
@@ -554,6 +569,27 @@ export function executeQuery(
   const filtered = transactions.filter(parsed.predicate);
   const operation = parsed.operation;
 
+  const finish = (outcome: QueryOutcome): { outcome: QueryOutcome } | { error: string } => {
+    if (!parsed.arithmetic || parsed.arithmetic.length === 0) return { outcome };
+    if (outcome.kind === "list" || outcome.kind === "group") {
+      return { error: "四则运算仅支持单值结果（合计/平均/计数/极值/最高月份）" };
+    }
+    let value: number | null = null;
+    if (outcome.kind === "sum" || outcome.kind === "average") value = outcome.amount;
+    else if (outcome.kind === "count") value = outcome.count;
+    else if (outcome.kind === "extreme") value = outcome.transaction?.amount ?? null;
+    else if (outcome.kind === "top-month") value = outcome.key ? outcome.amount : null;
+    if (value === null) return { outcome };
+    let result = value;
+    for (const item of parsed.arithmetic) {
+      if (item.op === "+") result += item.value;
+      else if (item.op === "-") result -= item.value;
+      else if (item.op === "*") result *= item.value;
+      else result /= item.value;
+    }
+    return { outcome: { kind: "arithmetic", value: result } };
+  };
+
   if (!operation || operation.kind === "sort") {
     const items = [...filtered];
     if (operation && operation.kind === "sort") {
@@ -564,12 +600,12 @@ export function executeQuery(
         return operation.direction === "desc" ? (av < bv ? 1 : -1) : av < bv ? -1 : 1;
       });
     }
-    return { outcome: { kind: "list", items: parsed.limit !== undefined ? items.slice(0, parsed.limit) : items } };
+    return finish({ kind: "list", items: parsed.limit !== undefined ? items.slice(0, parsed.limit) : items });
   }
 
   if (operation.kind === "extreme") {
     const typeItems = filtered.filter((item) => item.type === operation.type);
-    if (typeItems.length === 0) return { outcome: { kind: "extreme", transaction: undefined } };
+    if (typeItems.length === 0) return finish({ kind: "extreme", transaction: undefined });
     const target = typeItems.reduce((best, item) =>
       operation.mode === "max"
         ? item.amount > best.amount
@@ -579,26 +615,26 @@ export function executeQuery(
           ? item
           : best
     );
-    return { outcome: { kind: "extreme", transaction: target } };
+    return finish({ kind: "extreme", transaction: target });
   }
 
   if (operation.kind === "count") {
     const scoped = operation.type ? filtered.filter((item) => item.type === operation.type) : filtered;
-    return { outcome: { kind: "count", count: scoped.length } };
+    return finish({ kind: "count", count: scoped.length });
   }
 
   if (operation.kind === "sum" || operation.kind === "average") {
     const typeItems = filtered.filter((item) => item.type === operation.type);
     const amount = typeItems.reduce((sum, item) => sum + item.amount, 0);
-    return operation.kind === "sum"
-      ? { outcome: { kind: "sum", amount, count: typeItems.length } }
-      : {
-          outcome: {
+    return finish(
+      operation.kind === "sum"
+        ? { kind: "sum", amount, count: typeItems.length }
+        : {
             kind: "average",
             amount: typeItems.length ? amount / typeItems.length : 0,
             count: typeItems.length,
-          },
-        };
+          }
+    );
   }
 
   if (operation.kind === "group") {
@@ -636,12 +672,10 @@ export function executeQuery(
         }
       });
     }
-    return {
-      outcome: {
-        kind: "group",
-        groups: parsed.limit !== undefined ? groups.slice(0, parsed.limit) : groups,
-      },
-    };
+    return finish({
+      kind: "group",
+      groups: parsed.limit !== undefined ? groups.slice(0, parsed.limit) : groups,
+    });
   }
 
   const scoped = filtered.filter((item) => item.type === operation.type);
@@ -654,9 +688,9 @@ export function executeQuery(
     map.set(key, entry);
   }
   const top = [...map.entries()].sort((a, b) => b[1].amount - a[1].amount)[0];
-  return {
-    outcome: top
+  return finish(
+    top
       ? { kind: "top-month", key: top[0], amount: top[1].amount, count: top[1].count }
-      : { kind: "top-month", key: "", amount: 0, count: 0 },
-  };
+      : { kind: "top-month", key: "", amount: 0, count: 0 }
+  );
 }
