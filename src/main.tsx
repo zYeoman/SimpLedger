@@ -3,6 +3,19 @@ import { createPortal } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { useLiveQuery } from "dexie-react-hooks";
 import { App as CapacitorApp } from "@capacitor/app";
+import {
+  addSavedQuery,
+  isAiConfigured,
+  loadAiConfig,
+  loadSavedQueries,
+  persistSavedQueries,
+  saveAiConfig,
+  translateToQuery,
+  type AiConfig,
+  type AiChatTurn,
+  type SavedQuery,
+} from "./ai";
+import { executeQuery, type QueryOutcome } from "./query";
 import { Button, CenterPopup, DatePicker, Picker, Popup, TabBar } from "antd-mobile";
 import "antd-mobile/bundle/style.css";
 import type { Swiper as SwiperClass } from "swiper";
@@ -215,6 +228,9 @@ function App() {
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const isEntryOpenRef = useRef(false);
   const entryHistoryPushedRef = useRef(false);
+  const [isAiChatOpen, setIsAiChatOpen] = useState(false);
+  const isAiChatOpenRef = useRef(false);
+  const aiChatHistoryPushedRef = useRef(false);
   const autoWebdavBackupStartedRef = useRef(false);
   const autoCloudflareBackupStartedRef = useRef(false);
   const [statsMode, setStatsMode] = useState<StatsMode>("month");
@@ -257,7 +273,10 @@ function App() {
     // 让现有 popstate 逻辑处理；在首页且无状态时才退出到桌面。
     CapacitorApp.addListener("backButton", ({ canGoBack }) => {
       const hasAppState =
-        isEntryOpenRef.current || viewRef.current !== "home" || activeHistoryPopupTokens.size > 0;
+        isEntryOpenRef.current ||
+        isAiChatOpenRef.current ||
+        viewRef.current !== "home" ||
+        activeHistoryPopupTokens.size > 0;
       if (canGoBack || hasAppState) {
         window.history.back();
       } else {
@@ -321,12 +340,18 @@ function App() {
       if (activeHistoryPopupTokens.size > 0) {
         return;
       }
-      if (isEntryOpenRef.current) {
-        if (state.localMoneyEntry) return;
-        animateEntryClose();
-        return;
-      }
-      const stateView = state.localMoneyView as View | undefined;
+    if (isEntryOpenRef.current) {
+      if (state.localMoneyEntry) return;
+      animateEntryClose();
+      return;
+    }
+    if (isAiChatOpenRef.current) {
+      if (state.localMoneyAiChat) return;
+      isAiChatOpenRef.current = false;
+      setIsAiChatOpen(false);
+      return;
+    }
+    const stateView = state.localMoneyView as View | undefined;
       if (stateView) {
         switchView(stateView);
         return;
@@ -392,15 +417,20 @@ function App() {
           />
         )}
         {view === "stats" && (
-          <StatsPeriodControls
-            className="topbar-animated"
-            mode={statsMode}
-            setMode={setStatsMode}
-            month={statsMonth}
-            setMonth={setStatsMonth}
-            year={statsYear}
-            setYear={setStatsYear}
-          />
+          <div className="stats-controls-row">
+            <StatsPeriodControls
+              className="topbar-animated"
+              mode={statsMode}
+              setMode={setStatsMode}
+              month={statsMonth}
+              setMonth={setStatsMonth}
+              year={statsYear}
+              setYear={setStatsYear}
+            />
+            <Button className="stats-control-button" color="primary" fill="solid" onClick={openAiChat}>
+              AI统计
+            </Button>
+          </div>
         )}
       </header>
 
@@ -444,6 +474,18 @@ function App() {
         </section>
       )}
 
+      {isAiChatOpen && (
+        <section className="entry-page ai-chat-page" aria-labelledby="ai-chat-title">
+          <div className="ai-chat-header">
+            <h2 id="ai-chat-title">AI 查询</h2>
+            <button className="entry-close-button" aria-label="关闭" onClick={closeAiChat}>
+              <X size={22} />
+            </button>
+          </div>
+          <AiChatView transactions={transactions} categories={categories} accounts={accounts} />
+        </section>
+      )}
+
       <nav className="bottom-nav">
         <TabBar className="main-tabbar" activeKey={view} onChange={(key) => navigateView(key as View)}>
           <TabBar.Item key="home" icon={<Home size={20} />} title="首页" />
@@ -466,6 +508,24 @@ function App() {
     setIsEntryClosing(false);
     setIsEntryOpen(true);
     isEntryOpenRef.current = true;
+  }
+
+  function openAiChat() {
+    if (isAiChatOpenRef.current || !isDataReady) return;
+    window.history.pushState({ localMoneyAiChat: true }, "", window.location.href);
+    aiChatHistoryPushedRef.current = true;
+    isAiChatOpenRef.current = true;
+    setIsAiChatOpen(true);
+  }
+
+  function closeAiChat() {
+    const shouldPopHistory = aiChatHistoryPushedRef.current;
+    isAiChatOpenRef.current = false;
+    aiChatHistoryPushedRef.current = false;
+    setIsAiChatOpen(false);
+    if (shouldPopHistory) {
+      window.history.back();
+    }
   }
 
   function navigateView(nextView: View) {
@@ -1139,6 +1199,421 @@ function HomeView({
         <TodayAlmanacHeader isOpen={isAlmanacOpen} setIsOpen={setIsAlmanacOpen} />
         {detailItems.length === 0 ? <EmptyState /> : <VirtualTransactionList items={detailItems} categories={categories} goEdit={goEdit} />}
       </section>
+    </div>
+  );
+}
+
+type AiChatMessage = {
+  id: string;
+  role: "user" | "assistant";
+  text: string;
+  query?: string;
+  outcome?: QueryOutcome;
+  error?: string;
+  saved?: boolean;
+};
+
+function nextChatId() {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+const aiChatHistoryStorageKey = "localMoneyAiChatHistory";
+
+type StoredChatMessage = {
+  id: string;
+  role: "user" | "assistant";
+  text: string;
+  query?: string;
+  saved?: boolean;
+  outcome?: QueryOutcome;
+};
+
+function loadChatHistory(): StoredChatMessage[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(aiChatHistoryStorageKey) || "[]") as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (item): item is StoredChatMessage =>
+        Boolean(item) &&
+        typeof item === "object" &&
+        typeof (item as StoredChatMessage).id === "string" &&
+        ((item as StoredChatMessage).role === "user" || (item as StoredChatMessage).role === "assistant") &&
+        typeof (item as StoredChatMessage).text === "string"
+    );
+  } catch {
+    return [];
+  }
+}
+
+// 缓存结果时限制体积：列表/分组最多缓存前 10 条，其余结果原样缓存
+function cacheOutcome(outcome: QueryOutcome | undefined): QueryOutcome | undefined {
+  if (!outcome) return undefined;
+  if (outcome.kind === "list") {
+    return { kind: "list", items: outcome.items.slice(0, 10), total: outcome.items.length };
+  }
+  if (outcome.kind === "group") {
+    return { kind: "group", groups: outcome.groups.slice(0, 10) };
+  }
+  return outcome;
+}
+
+function AiChatView({
+  transactions,
+  categories,
+  accounts,
+}: {
+  transactions: Transaction[];
+  categories: ReturnType<typeof useCategories>;
+  accounts: Account[];
+}) {
+  // 只恢复对话文本与 DSL，不重跑查询
+  const [messages, setMessages] = useState<AiChatMessage[]>(() => loadChatHistory());
+  const [input, setInput] = useState("");
+  const [isSending, setIsSending] = useState(false);
+  const [savedQueries, setSavedQueries] = useState<SavedQuery[]>(loadSavedQueries);
+  const [savingForId, setSavingForId] = useState<string | null>(null);
+  const [savingName, setSavingName] = useState("");
+  const messagesRef = useRef<HTMLDivElement>(null);
+  const longPressTimerRef = useRef<number | undefined>(undefined);
+  const suppressClickRef = useRef(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const categoryNames = categories.map((item) => item.name);
+  const accountNames = accounts.length ? accounts.map((item) => item.name) : defaultAccounts;
+
+  function scrollToBottom() {
+    const container = messagesRef.current;
+    if (container) {
+      container.scrollTop = container.scrollHeight;
+    }
+  }
+
+  // 打开弹窗时滚到最新消息；新消息/加载中状态变化时也自动滚到底部
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(scrollToBottom);
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, isSending]);
+
+  function runQuery(query: string): { outcome?: QueryOutcome; error?: string } {
+    const result = executeQuery(query, transactions, categoryNames);
+    if ("error" in result) return { error: result.error };
+    return { outcome: result.outcome };
+  }
+
+  useEffect(() => {
+    const stored = messages.map(({ id, role, text, query, saved, outcome }) => ({
+      id,
+      role,
+      text,
+      query,
+      saved,
+      outcome: cacheOutcome(outcome),
+    }));
+    window.localStorage.setItem(aiChatHistoryStorageKey, JSON.stringify(stored.slice(-100)));
+  }, [messages]);
+
+  function clearLongPress() {
+    if (longPressTimerRef.current !== undefined) {
+      window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = undefined;
+    }
+  }
+
+  function startLongPress(messageId: string) {
+    clearLongPress();
+    longPressTimerRef.current = window.setTimeout(() => {
+      longPressTimerRef.current = undefined;
+      suppressClickRef.current = true;
+      setSelectedIds((current) => {
+        const next = new Set(current);
+        next.add(messageId);
+        return next;
+      });
+    }, 500);
+  }
+
+  function handleMessageClick(messageId: string) {
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false;
+      return;
+    }
+    if (selectedIds.size === 0) return;
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(messageId)) {
+        next.delete(messageId);
+      } else {
+        next.add(messageId);
+      }
+      return next;
+    });
+  }
+
+  function handleDeleteSelected() {
+    if (selectedIds.size === 0) return;
+    if (!window.confirm(`删除选中的 ${selectedIds.size} 条消息？`)) return;
+    setMessages((current) => current.filter((item) => !selectedIds.has(item.id)));
+    setSelectedIds(new Set());
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set());
+  }
+
+  useEffect(() => () => clearLongPress(), []);
+
+  function appendMessage(message: AiChatMessage) {
+    setMessages((current) => [...current, message]);
+  }
+
+  async function handleSend() {
+    const question = input.trim();
+    if (!question || isSending) return;
+    const config = loadAiConfig();
+    if (!isAiConfigured(config)) {
+      appendMessage({
+        id: nextChatId(),
+        role: "assistant",
+        text: "请先在「设置 → AI 查询」里配置 API 地址、密钥和模型。",
+      });
+      return;
+    }
+    setInput("");
+    setIsSending(true);
+    appendMessage({ id: nextChatId(), role: "user", text: question });
+    try {
+      const history: AiChatTurn[] = messages.slice(-19).map((message) => ({
+        role: message.role,
+        content: message.query ? `${message.text}\n查询：${message.query}` : message.text,
+      }));
+      const { answer, query } = await translateToQuery(config, question, categoryNames, accountNames, history);
+      if (!query) {
+        appendMessage({
+          id: nextChatId(),
+          role: "assistant",
+          text: answer.trim() || "（AI 没有返回有效内容，请换个说法重试，或检查 AI 配置）",
+        });
+        return;
+      }
+      const { outcome, error } = runQuery(query);
+      appendMessage({
+        id: nextChatId(),
+        role: "assistant",
+        text: error ? `${answer}\n（查询解析失败：${error}）` : answer,
+        query: error ? undefined : query,
+        outcome: error ? undefined : outcome,
+      });
+    } catch (error) {
+      appendMessage({
+        id: nextChatId(),
+        role: "assistant",
+        text: error instanceof Error ? error.message : "请求失败，请检查 AI 配置",
+      });
+    } finally {
+      setIsSending(false);
+    }
+  }
+
+  function handleRunSaved(saved: SavedQuery) {
+    const { outcome, error } = runQuery(saved.query);
+    appendMessage({
+      id: nextChatId(),
+      role: "assistant",
+      text: error ? `调用收藏「${saved.name}」失败：${error}` : `调用收藏「${saved.name}」`,
+      query: error ? undefined : saved.query,
+      outcome: error ? undefined : outcome,
+    });
+  }
+
+  function handleSaveQuery(messageId: string, query: string) {
+    const name = savingName.trim();
+    if (!name) return;
+    setSavedQueries((current) => {
+      const next = addSavedQuery(current, name, query);
+      persistSavedQueries(next);
+      return next;
+    });
+    setSavingForId(null);
+    setSavingName("");
+    setMessages((current) => current.map((item) => (item.id === messageId ? { ...item, saved: true } : item)));
+  }
+
+  function handleDeleteSaved(id: string) {
+    setSavedQueries((current) => {
+      const next = current.filter((item) => item.id !== id);
+      persistSavedQueries(next);
+      return next;
+    });
+  }
+
+  return (
+    <div className="ai-chat-view">
+      {savedQueries.length > 0 && (
+        <div className="saved-queries">
+          <div className="saved-queries-title">收藏的查询</div>
+          <div className="saved-query-list">
+            {savedQueries.map((item) => (
+              <div className="saved-query-chip" key={item.id}>
+                <button className="saved-query-run" onClick={() => handleRunSaved(item)}>
+                  {item.name}
+                </button>
+                <button className="saved-query-delete" aria-label="删除" onClick={() => handleDeleteSaved(item.id)}>
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      <div className="ai-messages" ref={messagesRef}>
+        {messages.length === 0 && <div className="ai-empty">用自然语言问，例如：这个月吃饭花了多少？</div>}
+        {messages.map((message) => (
+          <div
+            key={message.id}
+            className={`ai-message ai-message-${message.role} ${selectedIds.has(message.id) ? "ai-message-selected" : ""}`}
+            onClick={() => handleMessageClick(message.id)}
+            onPointerDown={() => {
+              if (savingForId !== message.id) startLongPress(message.id);
+            }}
+            onPointerUp={clearLongPress}
+            onPointerLeave={clearLongPress}
+            onPointerCancel={clearLongPress}
+            onContextMenu={(event) => event.preventDefault()}
+          >
+            <div className="ai-message-text">{message.text}</div>
+            {message.query && (
+              <div className="ai-query-block">
+                <code>{message.query}</code>
+                {!message.saved && (
+                  <button
+                    className="ai-save-query"
+                    onClick={() => {
+                      setSavingForId(message.id);
+                      setSavingName("");
+                    }}
+                  >
+                    收藏
+                  </button>
+                )}
+              </div>
+            )}
+            {savingForId === message.id && !message.saved && message.query && (
+              <div className="ai-save-form">
+                <input
+                  value={savingName}
+                  placeholder="给这个查询起个名字"
+                  onChange={(event) => setSavingName(event.target.value)}
+                />
+                <button onClick={() => handleSaveQuery(message.id, message.query!)}>保存</button>
+              </div>
+            )}
+            {message.outcome && <AiOutcomeView outcome={message.outcome} />}
+          </div>
+        ))}
+        {isSending && <div className="ai-message ai-message-assistant ai-thinking">正在查询...</div>}
+      </div>
+      {selectedIds.size > 0 && (
+        <div className="ai-select-toolbar">
+          <span>已选 {selectedIds.size} 条</span>
+          <button onClick={handleDeleteSelected}>删除</button>
+          <button onClick={clearSelection}>取消</button>
+        </div>
+      )}
+      <div className="ai-input-row">
+        <input
+          value={input}
+          placeholder="用自然语言问，比如：上个月交通花了多少"
+          onChange={(event) => setInput(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") void handleSend();
+          }}
+        />
+        <button disabled={isSending || !input.trim()} onClick={() => void handleSend()}>
+          发送
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function AiOutcomeView({ outcome }: { outcome: QueryOutcome }) {
+  if (outcome.kind === "list") {
+    const expense = sumByType(outcome.items as Transaction[], "expense");
+    const income = sumByType(outcome.items as Transaction[], "income");
+    return (
+      <div className="ai-result-list">
+        <div className="ai-result-summary">
+          共 {outcome.total ?? outcome.items.length} 笔 · 支出 {currency.format(expense)} · 收入 {currency.format(income)}
+        </div>
+        {outcome.items.slice(0, 30).map((item, index) => (
+          <div className="ai-result-row" key={`${(item as Transaction).id ?? ""}-${index}`}>
+            <span className="ai-result-date">{item.date}</span>
+            <span className="ai-result-category">{item.category}</span>
+            <span className="ai-result-note">{item.note || ""}</span>
+            <span
+              className={`ai-result-amount ${item.type === "expense" ? "amount-expense" : item.type === "income" ? "amount-income" : ""}`}
+            >
+              {item.type === "income" ? "+" : item.type === "expense" ? "-" : ""}
+              {currency.format(item.amount)}
+            </span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (outcome.kind === "extreme") {
+    if (!outcome.transaction) return <div className="ai-outcome-empty">没有符合条件的记录</div>;
+    const item = outcome.transaction as Transaction;
+    return (
+      <div className="ai-outcome-card">
+        <div className="ai-result-row">
+          <span className="ai-result-date">{item.date}</span>
+          <span className="ai-result-category">{item.category}</span>
+          <span className="ai-result-note">{item.note || ""}</span>
+          <span className="ai-result-amount amount-expense">{currency.format(item.amount)}</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (outcome.kind === "sum" || outcome.kind === "average") {
+    return (
+      <div className="ai-outcome-big">
+        {currency.format(outcome.amount)}
+        <span>
+          {outcome.kind === "sum" ? "合计" : "平均"} · 共 {outcome.count} 笔
+        </span>
+      </div>
+    );
+  }
+
+  if (outcome.kind === "top-month") {
+    if (!outcome.key) return <div className="ai-outcome-empty">没有符合条件的记录</div>;
+    return (
+      <div className="ai-outcome-big">
+        {outcome.key}
+        <span>
+          合计 {currency.format(outcome.amount)} · {outcome.count} 笔
+        </span>
+      </div>
+    );
+  }
+
+  if (outcome.groups.length === 0) return <div className="ai-outcome-empty">没有符合条件的记录</div>;
+  return (
+    <div className="ai-result-list">
+      {outcome.groups.map((group, index) => (
+        <div className={`ai-group-row ${index === 0 ? "ai-group-top" : ""}`} key={group.key}>
+          <span className="ai-result-category">{group.key}</span>
+          <span className="ai-result-note">{group.count} 笔</span>
+          <span className="ai-result-amount">{currency.format(group.amount)}</span>
+        </div>
+      ))}
     </div>
   );
 }
@@ -2965,6 +3440,8 @@ function SettingsView({
   const fileRef = useRef<HTMLInputElement>(null);
   const [updateStatus, setUpdateStatus] = useState("");
   const [updateUrl, setUpdateUrl] = useState("");
+  const [aiConfig, setAiConfig] = useState<AiConfig>(loadAiConfig);
+  const [isAiSettingsOpen, setIsAiSettingsOpen] = useState(false);
   const [webdavStatus, setWebdavStatus] = useState("");
   const [webdavConfig, setWebdavConfig] = useState<WebdavConfig>(loadWebdavConfig);
   const [isWebdavSettingsOpen, setIsWebdavSettingsOpen] = useState(false);
@@ -2981,6 +3458,10 @@ function SettingsView({
   useEffect(() => {
     saveWebdavConfig(webdavConfig);
   }, [webdavConfig]);
+
+  useEffect(() => {
+    saveAiConfig(aiConfig);
+  }, [aiConfig]);
 
   useEffect(() => {
     saveCloudflareBackupConfig(cloudflareConfig);
@@ -3146,6 +3627,50 @@ function SettingsView({
             前往 GitHub 下载新版本
           </a>
         )}
+      </div>
+      <div className="panel">
+        <div className="section-title">
+          <h2>AI 查询</h2>
+        </div>
+        <button
+          type="button"
+          className={`settings-action-button webdav-config-button ${isAiSettingsOpen ? "open" : ""}`}
+          onClick={() => setIsAiSettingsOpen((current) => !current)}
+        >
+          <Settings size={18} />
+          <span>AI 配置</span>
+          <em>{isAiConfigured(aiConfig) ? "已配置" : "未配置"}</em>
+        </button>
+        {isAiSettingsOpen && (
+          <div className="webdav-settings">
+            <label className="field webdav-field">
+              <span>API 地址</span>
+              <input
+                placeholder="https://api.openai.com/v1"
+                value={aiConfig.endpoint}
+                onChange={(event) => setAiConfig((current) => ({ ...current, endpoint: event.target.value }))}
+              />
+            </label>
+            <label className="field webdav-field">
+              <span>API Key</span>
+              <input
+                type="password"
+                placeholder="sk-..."
+                value={aiConfig.apiKey}
+                onChange={(event) => setAiConfig((current) => ({ ...current, apiKey: event.target.value }))}
+              />
+            </label>
+            <label className="field webdav-field">
+              <span>模型</span>
+              <input
+                placeholder="模型 ID"
+                value={aiConfig.model}
+                onChange={(event) => setAiConfig((current) => ({ ...current, model: event.target.value }))}
+              />
+            </label>
+          </div>
+        )}
+        <p className="setting-hint">密钥只保存在本机，请求直接发往你填写的地址；请确认信任该服务商。</p>
       </div>
       <div className="panel">
         <div className="section-title">
