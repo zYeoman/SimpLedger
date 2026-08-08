@@ -2,11 +2,10 @@ const latestKey = "local-money-latest.json";
 
 export default {
   async fetch(request, env) {
-    const corsHeaders = {
-      "Access-Control-Allow-Origin": env.ALLOWED_ORIGIN || "*",
-      "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-      "Access-Control-Allow-Headers": "Authorization,Content-Type",
-    };
+    const corsHeaders = buildCorsHeaders(request, env);
+    if (!corsHeaders) {
+      return json({ error: "Origin not allowed" }, 403, {});
+    }
 
     if (request.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: corsHeaders });
@@ -57,6 +56,30 @@ export default {
     return json({ error: "Not found" }, 404, corsHeaders);
   },
 };
+
+function buildCorsHeaders(request, env) {
+  const configured = (env.ALLOWED_ORIGINS || env.ALLOWED_ORIGIN || "").trim();
+  const allowlist = configured
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const origin = request.headers.get("Origin") || "";
+
+  // 未配置白名单时默认放行（安全性由 BACKUP_TOKEN 保证）
+  let allowOrigin = "*";
+  if (allowlist.length > 0 && !allowlist.includes("*")) {
+    if (origin && !allowlist.includes(origin)) {
+      return null;
+    }
+    allowOrigin = origin || "*";
+  }
+
+  return {
+    "Access-Control-Allow-Origin": allowOrigin,
+    "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+    "Access-Control-Allow-Headers": "Authorization,Content-Type",
+  };
+}
 
 function isAuthorized(request, token) {
   if (!token) return false;

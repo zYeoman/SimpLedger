@@ -9,6 +9,8 @@ bucket_name = "local-money-backup"
 # Set secrets with:
 # wrangler secret put BACKUP_TOKEN
 #
-# Optional: restrict CORS to your app origin.
+# Optional: restrict CORS to your app origins (comma separated).
+# The Capacitor Android APK uses the https://localhost origin, so include it
+# to let the app connect. Leave unset to allow all origins (auth is via BACKUP_TOKEN).
 # [vars]
-# ALLOWED_ORIGIN = "https://your-app.example.com"
+# ALLOWED_ORIGINS = "https://your-app.example.com,https://localhost"

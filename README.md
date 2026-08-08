@@ -174,6 +174,14 @@ wrangler deploy
 - Worker 地址，例如 `https://local-money-backup.example.workers.dev`
 - 备份令牌，即 `BACKUP_TOKEN`
 
+如果 Worker 配置了 `ALLOWED_ORIGINS`，记得把 `https://localhost` 也加进去（Capacitor
+APK 里 WebView 的 Origin），否则 App 内备份会被 CORS 拦截：
+
+```toml
+[vars]
+ALLOWED_ORIGINS = "https://你的网页域名,https://localhost"
+```
+
 Worker 会在 R2 中保存：
 
 - `local-money-latest.json`
