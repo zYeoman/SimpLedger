@@ -4,3 +4,6 @@ dist/
 .env.*
 .DS_Store
 npm-debug.log*
+# Android release signing（密钥库严禁提交）
+release.keystore
+release.keystore.b64

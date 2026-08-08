@@ -93,6 +93,9 @@ android/app/build/outputs/apk/debug/app-debug.apk
 keytool -genkey -v -keystore release.keystore -alias localmoney -keyalg RSA -keysize 2048 -validity 10000
 ```
 
+密钥库文件（`release.keystore`）已加入 .gitignore，不会被提交。请把密钥库和密码
+备份到安全位置——丢失后无法再更新已上架的应用。
+
 然后上传 Google Play 时使用 `app-release.aab`。
 
 ### 注意
