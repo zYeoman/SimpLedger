@@ -132,6 +132,7 @@ import "./styles.css";
 
 // 由 vite.config.ts 在编译期注入（native 构建为 true，网页构建为 false）
 declare const __CAPACITOR__: boolean;
+declare const __APP_VERSION__: string;
 
 type View = "home" | "assets" | "stats" | "settings";
 type StatsMode = "month" | "year" | "all";
@@ -2962,6 +2963,7 @@ function SettingsView({
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [updateStatus, setUpdateStatus] = useState("");
+  const [updateUrl, setUpdateUrl] = useState("");
   const [webdavStatus, setWebdavStatus] = useState("");
   const [webdavConfig, setWebdavConfig] = useState<WebdavConfig>(loadWebdavConfig);
   const [isWebdavSettingsOpen, setIsWebdavSettingsOpen] = useState(false);
@@ -3066,7 +3068,32 @@ function SettingsView({
 
   async function checkForUpdates() {
     if (__CAPACITOR__) {
-      setUpdateStatus("这是内置 App 版本，升级请重新安装新的 APK");
+      setUpdateUrl("");
+      try {
+        setUpdateStatus("正在检查 GitHub 更新...");
+        const response = await fetch("https://api.github.com/repos/zYeoman/SimpLedger/releases/latest");
+        if (response.status === 404) {
+          setUpdateStatus("GitHub 上还没有发布版本");
+          return;
+        }
+        if (!response.ok) throw new Error(`请求失败（${response.status}）`);
+        const release = (await response.json()) as { tag_name?: string; html_url?: string };
+        const tagName = typeof release.tag_name === "string" ? release.tag_name : "";
+        if (!tagName) {
+          setUpdateStatus("未找到版本信息");
+          return;
+        }
+        if (!isNewerVersion(tagName, __APP_VERSION__)) {
+          setUpdateStatus(`当前已是最新版本（${__APP_VERSION__}）`);
+          return;
+        }
+        setUpdateStatus(`发现新版本 ${tagName}（当前 ${__APP_VERSION__}）`);
+        if (typeof release.html_url === "string") {
+          setUpdateUrl(release.html_url);
+        }
+      } catch (error) {
+        setUpdateStatus(error instanceof Error ? `检查更新失败：${error.message}` : "检查更新失败");
+      }
       return;
     }
     if (!("serviceWorker" in navigator)) {
@@ -3113,6 +3140,11 @@ function SettingsView({
           </div>
         </div>
         {updateStatus && <p className="setting-hint">{updateStatus}</p>}
+        {updateUrl && (
+          <a className="secondary-button update-button" href={updateUrl}>
+            前往 GitHub 下载新版本
+          </a>
+        )}
       </div>
       <div className="panel">
         <div className="section-title">
@@ -3649,6 +3681,28 @@ function formatRecurringDays(rule: TransferRule) {
       .join("、");
   }
   return "";
+}
+
+function parseVersionNumbers(version: string): number[] {
+  return version
+    .replace(/^v/, "")
+    .split(".")
+    .map((part) => {
+      const match = part.match(/\d+/);
+      return match ? Number(match[0]) : 0;
+    });
+}
+
+function isNewerVersion(releaseVersion: string, currentVersion: string): boolean {
+  const release = parseVersionNumbers(releaseVersion);
+  const current = parseVersionNumbers(currentVersion);
+  const length = Math.max(release.length, current.length);
+  for (let index = 0; index < length; index++) {
+    const releasePart = release[index] ?? 0;
+    const currentPart = current[index] ?? 0;
+    if (releasePart !== currentPart) return releasePart > currentPart;
+  }
+  return false;
 }
 
 function CategorySettingsPanel({

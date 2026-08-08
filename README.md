@@ -80,6 +80,9 @@ android/app/build/outputs/apk/debug/app-debug.apk
 - debug APK：总是生成，作为 `app-debug-apk` 工件下载
 - release APK + AAB：仅在配置签名密钥后生成，作为 `app-release` 工件下载
 
+打 `v*` 标签且配置签名密钥后，release APK/AAB 还会自动发布到 GitHub Releases；
+App 设置页的“检查更新”会检查 GitHub 最新 Release，发现新版本时提供跳转下载链接。
+
 要生成签名的 release 包，在仓库 Settings → Secrets and variables → Actions 中配置：
 
 - `KEYSTORE_BASE64`：签名密钥库文件的 base64 内容
