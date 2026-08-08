@@ -1,5 +1,14 @@
 apply plugin: 'com.android.application'
 
+// 版本号以 package.json 的 version 为唯一来源：
+// versionCode = 主版本*10000 + 次版本*100 + 修订号，保证随版本递增
+def packageJson = new groovy.json.JsonSlurper().parseText(file('../../package.json').text)
+def appVersionParts = (packageJson.version as String).tokenize('.')
+def appVersionCode = (appVersionParts.size() > 0 ? appVersionParts[0] as int : 0) * 10000 +
+        (appVersionParts.size() > 1 ? appVersionParts[1] as int : 0) * 100 +
+        (appVersionParts.size() > 2 ? appVersionParts[2] as int : 0)
+def appVersionName = packageJson.version as String
+
 android {
     namespace = "com.simpleledger.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +16,8 @@ android {
         applicationId "com.simpleledger.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode appVersionCode
+        versionName appVersionName
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
