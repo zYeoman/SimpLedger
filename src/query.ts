@@ -265,6 +265,50 @@ function expandRelativeDateToken(token: string): Ast | null {
   return null;
 }
 
+// 相对日期写法：日偏移（-365、0）或日历相对 Y/M/D（0/0/0、0/-1/0）
+// 支持 A..B 范围，端点两种写法可混用
+function resolveRelativeDateValue(token: string): string | null {
+  const today = todayDate();
+  const dayOffsetMatch = /^-?\d+$/.exec(token);
+  if (dayOffsetMatch) {
+    const day = new Date(today);
+    day.setDate(day.getDate() + Number(dayOffsetMatch[0]));
+    return toDateString(day);
+  }
+  const calendarMatch = /^(-?\d+)\/(-?\d+)\/(-?\d+)$/.exec(token);
+  if (calendarMatch) {
+    const yearOffset = Number(calendarMatch[1]);
+    const monthOffset = Number(calendarMatch[2]);
+    const dayValue = Number(calendarMatch[3]);
+    const base = new Date(today.getFullYear(), today.getMonth() + monthOffset + yearOffset * 12, 1);
+    const lastDay = new Date(base.getFullYear(), base.getMonth() + 1, 0).getDate();
+    const day = dayValue === 0 ? 1 : dayValue > 0 ? Math.min(dayValue, lastDay) : lastDay + 1 + dayValue;
+    return toDateString(new Date(base.getFullYear(), base.getMonth(), day));
+  }
+  return null;
+}
+
+function expandRelativeDateValue(token: string): Ast | null {
+  const rangeParts = token.split("..");
+  if (rangeParts.length === 2) {
+    const start = resolveRelativeDateValue(rangeParts[0]);
+    let end = resolveRelativeDateValue(rangeParts[1]);
+    if (start && end) {
+      // 范围终点是“某月 1 号”写法（日位为 0）时按左闭右开处理，不包含该月第一天
+      if (/^-?\d+\/(-?\d+)\/0$/.test(rangeParts[1])) {
+        const endDate = new Date(`${end}T00:00:00`);
+        endDate.setDate(endDate.getDate() - 1);
+        end = toDateString(endDate);
+      }
+      return { kind: "field", field: "date", op: "range", value: start, value2: end };
+    }
+    return null;
+  }
+  const resolved = resolveRelativeDateValue(token);
+  if (resolved) return { kind: "field", field: "date", op: "eq", value: resolved };
+  return null;
+}
+
 function parseTerm(token: string, categoryNames: string[]): Ast | { error: string } {
   const typeValue = TYPE_WORDS[token];
   if (typeValue) {
@@ -273,6 +317,8 @@ function parseTerm(token: string, categoryNames: string[]): Ast | { error: strin
 
   const relativeDate = expandRelativeDateToken(token);
   if (relativeDate) return relativeDate;
+  const relativeValue = expandRelativeDateValue(token);
+  if (relativeValue) return relativeValue;
 
   const fieldMatch = FIELD_PATTERN.exec(token);
   if (fieldMatch) {
@@ -307,6 +353,8 @@ function parseTerm(token: string, categoryNames: string[]): Ast | { error: strin
       // 支持 日期:最近一年 / 日期:本月 这类写法
       const aliasExpanded = expandRelativeDateToken(rawValue);
       if (aliasExpanded) return aliasExpanded;
+      const relativeExpanded = expandRelativeDateValue(rawValue);
+      if (relativeExpanded) return relativeExpanded;
       const rangeParts = rawValue.split("..");
       if (rangeParts.length === 2) {
         return {
