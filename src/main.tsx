@@ -1592,6 +1592,15 @@ function AiOutcomeView({ outcome }: { outcome: QueryOutcome }) {
     );
   }
 
+  if (outcome.kind === "count") {
+    return (
+      <div className="ai-outcome-big">
+        {outcome.count}
+        <span>共 {outcome.count} 笔</span>
+      </div>
+    );
+  }
+
   if (outcome.kind === "top-month") {
     if (!outcome.key) return <div className="ai-outcome-empty">没有符合条件的记录</div>;
     return (
