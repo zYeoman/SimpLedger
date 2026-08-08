@@ -231,6 +231,7 @@ function App() {
   const [isAiChatOpen, setIsAiChatOpen] = useState(false);
   const isAiChatOpenRef = useRef(false);
   const aiChatHistoryPushedRef = useRef(false);
+  const [savedQueries, setSavedQueries] = useState<SavedQuery[]>(loadSavedQueries);
   const fabLongPressTimerRef = useRef<number | undefined>(undefined);
   const fabSuppressClickRef = useRef(false);
   const autoWebdavBackupStartedRef = useRef(false);
@@ -429,7 +430,7 @@ function App() {
               year={statsYear}
               setYear={setStatsYear}
             />
-            <Button className="stats-control-button" color="primary" fill="solid" onClick={openAiChat}>
+            <Button className="stats-control-button" color="primary" fill="solid" onClick={() => openAiChat()}>
               AI统计
             </Button>
           </div>
@@ -484,7 +485,14 @@ function App() {
               <X size={22} />
             </button>
           </div>
-          <AiChatView transactions={transactions} categories={categories} accounts={accounts} />
+          <AiChatView
+            transactions={transactions}
+            categories={categories}
+            accounts={accounts}
+            savedQueries={savedQueries}
+            onAddSavedQuery={handleAddSavedQuery}
+            onDeleteSavedQuery={handleDeleteSavedQuery}
+          />
         </section>
       )}
 
@@ -562,6 +570,22 @@ function App() {
     }, 500);
   }
 
+  function updateSavedQueries(updater: (current: SavedQuery[]) => SavedQuery[]) {
+    setSavedQueries((current) => {
+      const next = updater(current);
+      persistSavedQueries(next);
+      return next;
+    });
+  }
+
+  function handleAddSavedQuery(name: string, query: string) {
+    updateSavedQueries((current) => addSavedQuery(current, name, query));
+  }
+
+  function handleDeleteSavedQuery(id: string) {
+    updateSavedQueries((current) => current.filter((item) => item.id !== id));
+  }
+
   function navigateView(nextView: View) {
     if (nextView === viewRef.current) return;
     if (nextView === "home") {
@@ -615,6 +639,8 @@ function App() {
           month={statsMonth}
           year={statsYear}
           goEdit={openEntryPage}
+          savedQueries={savedQueries}
+          onDeleteSavedQuery={handleDeleteSavedQuery}
         />
       );
     }
@@ -1296,16 +1322,21 @@ function AiChatView({
   transactions,
   categories,
   accounts,
+  savedQueries,
+  onAddSavedQuery,
+  onDeleteSavedQuery,
 }: {
   transactions: Transaction[];
   categories: ReturnType<typeof useCategories>;
   accounts: Account[];
+  savedQueries: SavedQuery[];
+  onAddSavedQuery: (name: string, query: string) => void;
+  onDeleteSavedQuery: (id: string) => void;
 }) {
   // 只恢复对话文本与 DSL，不重跑查询
   const [messages, setMessages] = useState<AiChatMessage[]>(() => loadChatHistory());
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
-  const [savedQueries, setSavedQueries] = useState<SavedQuery[]>(loadSavedQueries);
   const [savingForId, setSavingForId] = useState<string | null>(null);
   const [savingName, setSavingName] = useState("");
   const messagesRef = useRef<HTMLDivElement>(null);
@@ -1466,22 +1497,14 @@ function AiChatView({
   function handleSaveQuery(messageId: string, query: string) {
     const name = savingName.trim();
     if (!name) return;
-    setSavedQueries((current) => {
-      const next = addSavedQuery(current, name, query);
-      persistSavedQueries(next);
-      return next;
-    });
+    onAddSavedQuery(name, query);
     setSavingForId(null);
     setSavingName("");
     setMessages((current) => current.map((item) => (item.id === messageId ? { ...item, saved: true } : item)));
   }
 
   function handleDeleteSaved(id: string) {
-    setSavedQueries((current) => {
-      const next = current.filter((item) => item.id !== id);
-      persistSavedQueries(next);
-      return next;
-    });
+    onDeleteSavedQuery(id);
   }
 
   return (
@@ -1659,6 +1682,33 @@ function AiOutcomeView({ outcome }: { outcome: QueryOutcome }) {
       ))}
     </div>
   );
+}
+
+function savedQueryOutcomeSummary(outcome: QueryOutcome): string {
+  switch (outcome.kind) {
+    case "list": {
+      const expense = sumByType(outcome.items as Transaction[], "expense");
+      const income = sumByType(outcome.items as Transaction[], "income");
+      const parts = [`${outcome.total ?? outcome.items.length} 笔`];
+      if (expense) parts.push(`支出${currency.format(expense)}`);
+      if (income) parts.push(`收入${currency.format(income)}`);
+      return parts.join(" · ");
+    }
+    case "extreme":
+      return outcome.transaction ? currency.format(outcome.transaction.amount) : "无记录";
+    case "sum":
+      return currency.format(outcome.amount);
+    case "average":
+      return `平均 ${currency.format(outcome.amount)}`;
+    case "count":
+      return `${outcome.count} 笔`;
+    case "group": {
+      const top = outcome.groups[0];
+      return top ? `${outcome.groups.length} 组 · 最高 ${top.key}` : "无记录";
+    }
+    case "top-month":
+      return outcome.key ? `${outcome.key} · ${currency.format(outcome.amount)}` : "无记录";
+  }
 }
 
 type TodayAlmanac = {
@@ -2961,6 +3011,8 @@ function StatsView({
   month,
   year,
   goEdit,
+  savedQueries,
+  onDeleteSavedQuery,
 }: {
   items: Transaction[];
   allItems: Transaction[];
@@ -2970,7 +3022,19 @@ function StatsView({
   month: string;
   year: string;
   goEdit: (transaction: Transaction) => void;
+  savedQueries: SavedQuery[];
+  onDeleteSavedQuery: (id: string) => void;
 }) {
+  const categoryNames = categories.map((item) => item.name);
+  const savedQueryResults = useMemo(
+    () =>
+      savedQueries.map((saved) => {
+        const result = executeQuery(saved.query, allItems, categoryNames);
+        if ("error" in result) return { saved, error: result.error };
+        return { saved, outcome: result.outcome };
+      }),
+    [savedQueries, allItems, categoryNames]
+  );
   const accountKindByName = new Map(accounts.map((account) => [account.name, accountKindOf(account)]));
   const allNonTransferItems = allItems.filter((item) => item.type !== "transfer");
   const allOrdinaryItems = allNonTransferItems.filter((item) => (accountKindByName.get(item.account || defaultAccounts[0]) ?? inferAccountKind(item.account || defaultAccounts[0])) !== "investment");
@@ -3017,6 +3081,31 @@ function StatsView({
           <div>
             <span>理财盈亏</span>
             <strong className={investmentProfit < 0 ? "expense" : ""} title={currency.format(investmentProfit)} style={fitStatsAmountStyle(investmentProfit)}>{currency.format(investmentProfit)}</strong>
+          </div>
+        </div>
+      )}
+      {savedQueries.length > 0 && (
+        <div className="panel stats-saved-card">
+          <div className="section-title">
+            <h2>收藏的查询</h2>
+          </div>
+          <div className="saved-query-rows">
+            {savedQueryResults.map(({ saved, outcome, error }) => (
+              <div className="saved-query-row" key={saved.id}>
+                <div className="saved-query-info">
+                  <strong>{saved.name}</strong>
+                  <span>{saved.query}</span>
+                </div>
+                {error ? (
+                  <em className="saved-query-summary saved-query-error">查询无效</em>
+                ) : outcome ? (
+                  <em className="saved-query-summary">{savedQueryOutcomeSummary(outcome)}</em>
+                ) : null}
+                <button className="saved-query-row-delete" aria-label="删除" onClick={() => onDeleteSavedQuery(saved.id)}>
+                  ×
+                </button>
+              </div>
+            ))}
           </div>
         </div>
       )}
