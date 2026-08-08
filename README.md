@@ -47,6 +47,62 @@ npm run build
 npm run preview
 ```
 
+## 打包成 Android 应用（Capacitor）
+
+项目已集成 Capacitor，`android/` 目录就是完整的 Android 工程。
+
+### 本地打包
+
+需要本机安装 JDK 21 和 Android SDK（或直接装 Android Studio）。然后：
+
+```bash
+npm install
+npm run android:apk
+```
+
+`android:apk` 使用 `build:native`（`vite build --mode native`）构建，网页部署继续用
+`npm run build`，两套产物在编译期就区分开，互不包含对方逻辑。
+
+生成的 debug APK 位于：
+
+```text
+android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+也可以只用 `npm run android:sync` 同步 Web 资源，再用 Android Studio 打开
+`android/` 目录（`npm run android:open`）构建或调试。
+
+### GitHub Actions 自动构建
+
+仓库已包含 `.github/workflows/build-apk.yml`，推送到 `main` 分支、打 `v*` 标签
+或手动触发时，会在云端自动构建：
+
+- debug APK：总是生成，作为 `app-debug-apk` 工件下载
+- release APK + AAB：仅在配置签名密钥后生成，作为 `app-release` 工件下载
+
+要生成签名的 release 包，在仓库 Settings → Secrets and variables → Actions 中配置：
+
+- `KEYSTORE_BASE64`：签名密钥库文件的 base64 内容
+- `KEYSTORE_PASSWORD`：密钥库密码
+- `KEY_ALIAS`：密钥别名
+- `KEY_PASSWORD`：密钥密码
+
+本地生成签名密钥库示例：
+
+```bash
+keytool -genkey -v -keystore release.keystore -alias localmoney -keyalg RSA -keysize 2048 -validity 10000
+```
+
+然后上传 Google Play 时使用 `app-release.aab`。
+
+### 注意
+
+Capacitor 版本的数据（IndexedDB）和网页 PWA 版本相互独立，换用 App 时可用设置页的
+JSON / WebDAV / Cloudflare 备份迁移数据。
+
+App 内不会注册 Service Worker（资源已随 APK 打包，且旧缓存会导致升级后白屏）；网页版
+PWA 的 Service Worker 保持原样。
+
 ## 部署到 Vercel
 
 Vercel 设置保持 Vite 默认即可：
