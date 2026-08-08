@@ -129,6 +129,9 @@ import {
 } from "./webdav";
 import "./styles.css";
 
+// 由 vite.config.ts 在编译期注入（native 构建为 true，网页构建为 false）
+declare const __CAPACITOR__: boolean;
+
 type View = "home" | "assets" | "stats" | "settings";
 type StatsMode = "month" | "year" | "all";
 
@@ -159,6 +162,35 @@ function readHomeAccountFilters() {
 function readThemeColor() {
   if (typeof window === "undefined") return defaultThemeColor;
   return window.localStorage.getItem(themeColorStorageKey) || defaultThemeColor;
+}
+
+function cleanupNativeServiceWorker() {
+  let cleaned = false;
+  navigator.serviceWorker
+    .getRegistrations()
+    .then((registrations) => {
+      if (registrations.length) {
+        cleaned = true;
+        return Promise.all(registrations.map((registration) => registration.unregister()));
+      }
+    })
+    .then(() => {
+      if (!("caches" in window)) return;
+      return caches.keys().then((keys) => {
+        if (keys.length) {
+          cleaned = true;
+          return Promise.all(keys.map((key) => caches.delete(key)));
+        }
+      });
+    })
+    .then(() => {
+      // 旧 SW 仍可能控制着当前页面，清理成功后刷新一次，让页面脱离 SW 从本地资源重新加载。
+      if (cleaned && !window.sessionStorage.getItem("localMoneySwCleanupDone")) {
+        window.sessionStorage.setItem("localMoneySwCleanupDone", "1");
+        window.location.reload();
+      }
+    })
+    .catch(() => undefined);
 }
 
 function applyThemeColor(color: string) {
@@ -201,7 +233,12 @@ function App() {
       if (isActive) setIsSeedReady(true);
     });
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/public-sw.js").catch(() => undefined);
+      if (__CAPACITOR__) {
+        // 原生 App 内资源已打包进 APK，不需要 Service Worker，反而会带来旧缓存问题
+        cleanupNativeServiceWorker();
+      } else {
+        navigator.serviceWorker.register("/public-sw.js").catch(() => undefined);
+      }
     }
     return () => {
       isActive = false;
@@ -3008,6 +3045,10 @@ function SettingsView({
   }
 
   async function checkForUpdates() {
+    if (__CAPACITOR__) {
+      setUpdateStatus("这是内置 App 版本，升级请重新安装新的 APK");
+      return;
+    }
     if (!("serviceWorker" in navigator)) {
       setUpdateStatus("当前浏览器不支持应用更新检查");
       return;

@@ -37,7 +37,7 @@ button {
   width: min(100%, 520px);
   min-height: 100vh;
   margin: 0 auto;
-  padding: 20px 16px 92px;
+  padding: calc(20px + env(safe-area-inset-top)) 16px 92px;
 }
 
 .topbar {
