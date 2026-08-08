@@ -199,6 +199,10 @@ function applyThemeColor(color: string) {
 }
 
 applyThemeColor(readThemeColor());
+if (__CAPACITOR__) {
+  // native 构建专属标记：样式里据此给状态栏区域铺不透明背景
+  document.body.classList.add("native-shell");
+}
 
 function App() {
   const [view, setView] = useState<View>("home");

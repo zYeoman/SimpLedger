@@ -22,6 +22,21 @@ body {
   background: #f7f3ec;
 }
 
+/* App（native）模式下，在状态栏区域铺一层与应用背景同色的固定背景，
+   即使内容滚动也不会从状态栏底下透过去，视觉上状态栏始终不透明。
+   仅当 body 带 native-shell 类（native 构建注入）时生效，网页不受影响。 */
+.native-shell::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: env(safe-area-inset-top);
+  background: #f7f3ec;
+  z-index: 9999;
+  pointer-events: none;
+}
+
 button,
 input,
 select {
