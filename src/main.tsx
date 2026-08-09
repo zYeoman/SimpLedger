@@ -3049,8 +3049,20 @@ function StatsView({
   savedQueries: SavedQuery[];
 }) {
   const [hiddenSavedIds, setHiddenSavedIds] = useState<Set<string>>(() => loadHiddenSavedQueryIds());
-  const visibleSavedQueries = savedQueries.filter((item) => !hiddenSavedIds.has(item.id));
   const categoryNames = categories.map((item) => item.name);
+
+  // 收藏被删除（如在聊天页）后，清理统计页隐藏列表中已失效的 ID
+  useEffect(() => {
+    setHiddenSavedIds((current) => {
+      const validIds = new Set(savedQueries.map((item) => item.id));
+      const pruned = new Set([...current].filter((id) => validIds.has(id)));
+      if (pruned.size !== current.size) {
+        persistHiddenSavedQueryIds(pruned);
+        return pruned;
+      }
+      return current;
+    });
+  }, [savedQueries]);
   const savedQueryResults = useMemo(
     () =>
       savedQueries.map((saved) => {
