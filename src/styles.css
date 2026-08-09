@@ -3164,6 +3164,16 @@ h1 {
   padding: 4px;
 }
 
+.saved-query-restore {
+  margin-top: 10px;
+  border: 0;
+  background: transparent;
+  color: var(--theme-primary);
+  font-size: 13px;
+  font-weight: 800;
+  padding: 4px 0;
+}
+
 .ai-messages {
   flex: 1;
   min-height: 0;

@@ -640,7 +640,6 @@ function App() {
           year={statsYear}
           goEdit={openEntryPage}
           savedQueries={savedQueries}
-          onDeleteSavedQuery={handleDeleteSavedQuery}
         />
       );
     }
@@ -1278,6 +1277,22 @@ function nextChatId() {
 }
 
 const aiChatHistoryStorageKey = "localMoneyAiChatHistory";
+const statsHiddenSavedQueriesStorageKey = "localMoneyStatsHiddenSavedQueries";
+
+function loadHiddenSavedQueryIds(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(statsHiddenSavedQueriesStorageKey) || "[]") as unknown;
+    if (!Array.isArray(parsed)) return new Set();
+    return new Set(parsed.filter((item): item is string => typeof item === "string"));
+  } catch {
+    return new Set();
+  }
+}
+
+function persistHiddenSavedQueryIds(ids: Set<string>) {
+  window.localStorage.setItem(statsHiddenSavedQueriesStorageKey, JSON.stringify([...ids]));
+}
 
 type StoredChatMessage = {
   id: string;
@@ -3022,7 +3037,6 @@ function StatsView({
   year,
   goEdit,
   savedQueries,
-  onDeleteSavedQuery,
 }: {
   items: Transaction[];
   allItems: Transaction[];
@@ -3033,8 +3047,9 @@ function StatsView({
   year: string;
   goEdit: (transaction: Transaction) => void;
   savedQueries: SavedQuery[];
-  onDeleteSavedQuery: (id: string) => void;
 }) {
+  const [hiddenSavedIds, setHiddenSavedIds] = useState<Set<string>>(() => loadHiddenSavedQueryIds());
+  const visibleSavedQueries = savedQueries.filter((item) => !hiddenSavedIds.has(item.id));
   const categoryNames = categories.map((item) => item.name);
   const savedQueryResults = useMemo(
     () =>
@@ -3045,6 +3060,20 @@ function StatsView({
       }),
     [savedQueries, allItems, categoryNames]
   );
+
+  function hideSavedQuery(id: string) {
+    setHiddenSavedIds((current) => {
+      const next = new Set(current);
+      next.add(id);
+      persistHiddenSavedQueryIds(next);
+      return next;
+    });
+  }
+
+  function restoreHiddenSavedQueries() {
+    setHiddenSavedIds(new Set());
+    persistHiddenSavedQueryIds(new Set());
+  }
   const accountKindByName = new Map(accounts.map((account) => [account.name, accountKindOf(account)]));
   const allNonTransferItems = allItems.filter((item) => item.type !== "transfer");
   const allOrdinaryItems = allNonTransferItems.filter((item) => (accountKindByName.get(item.account || defaultAccounts[0]) ?? inferAccountKind(item.account || defaultAccounts[0])) !== "investment");
@@ -3100,7 +3129,7 @@ function StatsView({
             <h2>收藏的查询</h2>
           </div>
           <div className="saved-query-rows">
-            {savedQueryResults.map(({ saved, outcome, error }) => (
+            {savedQueryResults.filter(({ saved }) => !hiddenSavedIds.has(saved.id)).map(({ saved, outcome, error }) => (
               <div className="saved-query-row" key={saved.id}>
                 <div className="saved-query-info">
                   <strong>{saved.name}</strong>
@@ -3111,12 +3140,17 @@ function StatsView({
                 ) : outcome ? (
                   <em className="saved-query-summary">{savedQueryOutcomeSummary(outcome)}</em>
                 ) : null}
-                <button className="saved-query-row-delete" aria-label="删除" onClick={() => onDeleteSavedQuery(saved.id)}>
+                <button className="saved-query-row-delete" aria-label="在统计页隐藏" onClick={() => hideSavedQuery(saved.id)}>
                   ×
                 </button>
               </div>
             ))}
           </div>
+          {hiddenSavedIds.size > 0 && (
+            <button className="saved-query-restore" onClick={restoreHiddenSavedQueries}>
+              恢复隐藏的查询
+            </button>
+          )}
         </div>
       )}
       <StatsCategorySection
