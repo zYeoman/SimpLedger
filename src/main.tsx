@@ -1384,6 +1384,8 @@ function AiChatView({
   const [savingName, setSavingName] = useState("");
   const [retryingId, setRetryingId] = useState<string | null>(null);
   const [copiedQueryId, setCopiedQueryId] = useState<string | null>(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const nativeKeyboardHeightRef = useRef<number | null>(null);
   const messagesRef = useRef<HTMLDivElement>(null);
   const longPressTimerRef = useRef<number | undefined>(undefined);
   const suppressClickRef = useRef(false);
@@ -1407,6 +1409,41 @@ function AiChatView({
   useEffect(() => {
     scrollToBottom();
   }, [messages, isSending]);
+
+  // 键盘弹出时把输入框顶到键盘上方：
+  // 网页版靠浏览器收缩 visualViewport；App 端以 MainActivity 的 window 事件为准，
+  // visualViewport（M139+ WebView）作为兜底
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+    const updateKeyboardHeight = () => {
+      if (__CAPACITOR__ && nativeKeyboardHeightRef.current != null) return;
+      setKeyboardHeight(Math.max(0, window.innerHeight - viewport.height - (viewport.offsetTop || 0)));
+    };
+    viewport.addEventListener("resize", updateKeyboardHeight);
+    viewport.addEventListener("scroll", updateKeyboardHeight);
+    updateKeyboardHeight();
+    return () => {
+      viewport.removeEventListener("resize", updateKeyboardHeight);
+      viewport.removeEventListener("scroll", updateKeyboardHeight);
+    };
+  }, []);
+
+  // App 端：adjustNothing 下 visualViewport 不变化，由 MainActivity 通过 window 事件
+  // 通知键盘高度（物理像素），转成 CSS 像素后作为输入框底部 padding
+  useEffect(() => {
+    if (!__CAPACITOR__) return;
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<unknown>).detail;
+      const height = typeof detail === "number" ? detail : typeof detail === "string" ? Number(detail) : NaN;
+      if (Number.isFinite(height)) {
+        nativeKeyboardHeightRef.current = Math.max(0, height / (window.devicePixelRatio || 1));
+        setKeyboardHeight(nativeKeyboardHeightRef.current);
+      }
+    };
+    window.addEventListener("localMoneyKeyboardHeight", handler);
+    return () => window.removeEventListener("localMoneyKeyboardHeight", handler);
+  }, []);
 
   function runQuery(query: string): { outcome?: QueryOutcome; error?: string } {
     const result = executeQuery(query, transactions, categoryNames);
@@ -1649,7 +1686,7 @@ function AiChatView({
   }
 
   return (
-    <div className="ai-chat-view">
+    <div className="ai-chat-view" style={{ paddingBottom: `calc(16px + env(safe-area-inset-bottom) + ${keyboardHeight}px)` }}>
       {savedQueries.length > 0 && (
         <div className="saved-queries">
           <div className="saved-queries-title">收藏的查询</div>
