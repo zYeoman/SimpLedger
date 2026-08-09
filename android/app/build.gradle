@@ -12,6 +12,13 @@ def appVersionName = packageJson.version as String
 android {
     namespace = "com.simpleledger.app"
     compileSdk = rootProject.ext.compileSdkVersion
+    // 产物统一命名：SimpLedger-<buildType>-<version>.apk / SimpLedger-<version>-release.aab
+    archivesBaseName = "SimpLedger-${appVersionName}"
+    applicationVariants.all { variant ->
+        variant.outputs.all { output ->
+            outputFileName = "SimpLedger-${variant.name}-${appVersionName}.apk"
+        }
+    }
     defaultConfig {
         applicationId "com.simpleledger.app"
         minSdkVersion rootProject.ext.minSdkVersion
