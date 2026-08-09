@@ -8,8 +8,8 @@ export type AiConfig = {
 };
 
 export type AiQueryResult = {
-  answer: string;
   query: string;
+  empty: boolean;
 };
 
 export type AiChatTurn = {
@@ -110,8 +110,8 @@ export async function translateToQuery(
     `可用账户：${accountNames.join("、") || "（无）"}`,
     `今天是 ${today}。用户说“这个月”“本月”请用 日期:${today.slice(0, 7)}；说“上个月”请推算出上个月的 YYYY-MM。`,
     "结合对话历史理解指代（如“刚才”“那个查询”“只保留餐饮”），必要时修正或复用之前的查询。",
-    '只输出 JSON，格式：{"answer": "给用户的一句话说明", "query": "翻译后的 DSL"}',
-    "如果问题不适合翻译成查询（例如闲聊、问功能），query 返回空字符串，answer 正常回答。",
+    '只输出 JSON，格式：{"query": "翻译后的 DSL"}',
+    "不要输出任何说明文字；如果问题不适合翻译成查询（例如闲聊、问功能），query 返回空字符串。",
   ].join("\n");
 
   const body: Record<string, unknown> = {
@@ -137,18 +137,7 @@ export async function translateToQuery(
   let content = data.choices?.[0]?.message?.content ?? "";
   let parsed = extractJsonObject(content);
 
-  const isEffectivelyEmpty = (text: string, obj: unknown): boolean => {
-    if (!text.trim()) return true;
-    if (obj && typeof obj === "object") {
-      const record = obj as Record<string, unknown>;
-      const answer = typeof record.answer === "string" ? record.answer : "";
-      const query = typeof record.query === "string" ? record.query : "";
-      return answer.trim() === "" && query.trim() === "";
-    }
-    return false;
-  };
-
-  if (isEffectivelyEmpty(content, parsed) && history.length > 3) {
+  if (!content.trim() && history.length > 3) {
     // 返回为空时不开启思考，而是把上下文删减到最近 3 条后重试一次
     const retryBody = {
       ...body,
@@ -168,11 +157,11 @@ export async function translateToQuery(
   if (parsed && typeof parsed === "object") {
     const record = parsed as Record<string, unknown>;
     return {
-      answer: typeof record.answer === "string" ? record.answer : "",
       query: typeof record.query === "string" ? record.query.trim() : "",
+      empty: false,
     };
   }
-  return { answer: content.trim() || "（AI 没有返回有效内容）", query: "" };
+  return { query: "", empty: true };
 }
 
 async function postChat(config: AiConfig, body: Record<string, unknown>): Promise<Response> {

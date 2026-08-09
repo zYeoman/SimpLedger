@@ -3237,7 +3237,43 @@ h1 {
   font-size: 12px;
   color: #3d4a44;
   overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.ai-copy-query {
+  min-height: 30px;
+  border: 1px solid #e6ded1;
+  border-radius: 8px;
+  background: #eef0e7;
+  color: #27322f;
+  font-weight: 800;
+  padding: 0 10px;
+  font-size: 12px;
   white-space: nowrap;
+}
+
+.ai-copy-query:active {
+  background: #e3e6d8;
+}
+
+.ai-retry-row {
+  margin-top: 8px;
+}
+
+.ai-retry-row button {
+  min-height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--theme-primary);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 0 14px;
+}
+
+.ai-retry-row button:disabled {
+  opacity: 0.6;
 }
 
 .ai-save-query {

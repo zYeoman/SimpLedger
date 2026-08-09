@@ -1270,6 +1270,7 @@ type AiChatMessage = {
   outcome?: QueryOutcome;
   error?: string;
   saved?: boolean;
+  failed?: boolean;
 };
 
 function nextChatId() {
@@ -1333,6 +1334,18 @@ function cacheOutcome(outcome: QueryOutcome | undefined): QueryOutcome | undefin
   return outcome;
 }
 
+function buildChatHistory(messages: AiChatMessage[]): AiChatTurn[] {
+  const history: AiChatTurn[] = [];
+  for (const message of messages.slice(-19)) {
+    if (message.role === "user") {
+      history.push({ role: "user", content: message.text });
+    } else if (message.query) {
+      history.push({ role: "assistant", content: `查询：${message.query}` });
+    }
+  }
+  return history;
+}
+
 function AiChatView({
   transactions,
   categories,
@@ -1354,6 +1367,8 @@ function AiChatView({
   const [isSending, setIsSending] = useState(false);
   const [savingForId, setSavingForId] = useState<string | null>(null);
   const [savingName, setSavingName] = useState("");
+  const [retryingId, setRetryingId] = useState<string | null>(null);
+  const [copiedQueryId, setCopiedQueryId] = useState<string | null>(null);
   const messagesRef = useRef<HTMLDivElement>(null);
   const longPressTimerRef = useRef<number | undefined>(undefined);
   const suppressClickRef = useRef(false);
@@ -1466,16 +1481,22 @@ function AiChatView({
     setIsSending(true);
     appendMessage({ id: nextChatId(), role: "user", text: question });
     try {
-      const history: AiChatTurn[] = messages.slice(-19).map((message) => ({
-        role: message.role,
-        content: message.query ? `${message.text}\n查询：${message.query}` : message.text,
-      }));
-      const { answer, query } = await translateToQuery(config, question, categoryNames, accountNames, history);
+      const history = buildChatHistory(messages);
+      const { query, empty } = await translateToQuery(config, question, categoryNames, accountNames, history);
+      if (empty) {
+        appendMessage({
+          id: nextChatId(),
+          role: "assistant",
+          text: "（AI 没有返回有效内容，请重试或检查 AI 配置）",
+          failed: true,
+        });
+        return;
+      }
       if (!query) {
         appendMessage({
           id: nextChatId(),
           role: "assistant",
-          text: answer.trim() || "（AI 没有返回有效内容，请换个说法重试，或检查 AI 配置）",
+          text: "我只支持查询类问题，例如：这个月餐饮花了多少、最近一年月均水电费。",
         });
         return;
       }
@@ -1483,15 +1504,17 @@ function AiChatView({
       appendMessage({
         id: nextChatId(),
         role: "assistant",
-        text: error ? `${answer}\n（查询解析失败：${error}）` : answer,
+        text: error ? `（查询解析失败：${error}）` : "",
         query: error ? undefined : query,
         outcome: error ? undefined : outcome,
+        failed: error ? true : undefined,
       });
     } catch (error) {
       appendMessage({
         id: nextChatId(),
         role: "assistant",
         text: error instanceof Error ? error.message : "请求失败，请检查 AI 配置",
+        failed: true,
       });
     } finally {
       setIsSending(false);
@@ -1507,6 +1530,91 @@ function AiChatView({
       query: error ? undefined : saved.query,
       outcome: error ? undefined : outcome,
     });
+  }
+
+  async function handleRetry(failedId: string) {
+    if (retryingId) return;
+    const failedIndex = messages.findIndex((message) => message.id === failedId);
+    if (failedIndex < 0) return;
+    let question = "";
+    let userCount = 0;
+    const history: AiChatTurn[] = [];
+    for (let index = failedIndex - 1; index >= 0; index--) {
+      const message = messages[index];
+      if (message.role !== "user") continue;
+      if (userCount === 0) {
+        question = message.text;
+      } else if (userCount <= 2) {
+        history.unshift({ role: "user", content: message.text });
+      } else {
+        break;
+      }
+      userCount++;
+    }
+    if (!question) return;
+    const config = loadAiConfig();
+    if (!isAiConfigured(config)) {
+      appendMessage({
+        id: nextChatId(),
+        role: "assistant",
+        text: "请先在「设置 → AI 查询」里配置 API 地址、密钥和模型。",
+      });
+      return;
+    }
+    setRetryingId(failedId);
+    try {
+      const { query, empty } = await translateToQuery(config, question, categoryNames, accountNames, history);
+      if (empty) {
+        appendMessage({
+          id: nextChatId(),
+          role: "assistant",
+          text: "（AI 没有返回有效内容，请重试或检查 AI 配置）",
+          failed: true,
+        });
+        return;
+      }
+      if (!query) {
+        appendMessage({
+          id: nextChatId(),
+          role: "assistant",
+          text: "我只支持查询类问题，例如：这个月餐饮花了多少、最近一年月均水电费。",
+        });
+        return;
+      }
+      const { outcome, error } = runQuery(query);
+      appendMessage({
+        id: nextChatId(),
+        role: "assistant",
+        text: error ? `（查询解析失败：${error}）` : "",
+        query: error ? undefined : query,
+        outcome: error ? undefined : outcome,
+        failed: error ? true : undefined,
+      });
+    } catch (error) {
+      appendMessage({
+        id: nextChatId(),
+        role: "assistant",
+        text: error instanceof Error ? error.message : "请求失败，请检查 AI 配置",
+        failed: true,
+      });
+    } finally {
+      setRetryingId(null);
+    }
+  }
+
+  async function copyQuery(messageId: string, query: string) {
+    try {
+      await navigator.clipboard.writeText(query);
+    } catch {
+      const textarea = document.createElement("textarea");
+      textarea.value = query;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+    }
+    setCopiedQueryId(messageId);
+    window.setTimeout(() => setCopiedQueryId((current) => (current === messageId ? null : current)), 1500);
   }
 
   function handleSaveQuery(messageId: string, query: string) {
@@ -1556,10 +1664,13 @@ function AiChatView({
             onPointerCancel={clearLongPress}
             onContextMenu={(event) => event.preventDefault()}
           >
-            <div className="ai-message-text">{message.text}</div>
+            {message.text && <div className="ai-message-text">{message.text}</div>}
             {message.query && (
               <div className="ai-query-block">
                 <code>{message.query}</code>
+                <button className="ai-copy-query" onClick={() => copyQuery(message.id, message.query!)}>
+                  {copiedQueryId === message.id ? "已复制" : "复制"}
+                </button>
                 {!message.saved && (
                   <button
                     className="ai-save-query"
@@ -1584,6 +1695,13 @@ function AiChatView({
               </div>
             )}
             {message.outcome && <AiOutcomeView outcome={message.outcome} />}
+            {message.failed && (
+              <div className="ai-retry-row">
+                <button disabled={retryingId !== null} onClick={() => void handleRetry(message.id)}>
+                  {retryingId === message.id ? "正在重试..." : "重试"}
+                </button>
+              </div>
+            )}
           </div>
         ))}
         {isSending && <div className="ai-message ai-message-assistant ai-thinking">正在查询...</div>}
