@@ -231,6 +231,7 @@ function App() {
   const isEntryOpenRef = useRef(false);
   const entryHistoryPushedRef = useRef(false);
   const [isAiChatOpen, setIsAiChatOpen] = useState(false);
+  const [isAiChatClosing, setIsAiChatClosing] = useState(false);
   const isAiChatOpenRef = useRef(false);
   const aiChatHistoryPushedRef = useRef(false);
   const [savedQueries, setSavedQueries] = useState<SavedQuery[]>(loadSavedQueries);
@@ -353,7 +354,7 @@ function App() {
     if (isAiChatOpenRef.current) {
       if (state.localMoneyAiChat) return;
       isAiChatOpenRef.current = false;
-      setIsAiChatOpen(false);
+      animateAiChatClose();
       return;
     }
     const stateView = state.localMoneyView as View | undefined;
@@ -480,7 +481,7 @@ function App() {
       )}
 
       {isAiChatOpen && (
-        <section className="entry-page ai-chat-page" aria-labelledby="ai-chat-title">
+        <section className={`entry-page ai-chat-page ${isAiChatClosing ? "leaving" : ""}`} aria-labelledby="ai-chat-title">
           <div className="ai-chat-header">
             <h2 id="ai-chat-title">AI 查询</h2>
             <button className="entry-close-button" aria-label="关闭" onClick={closeAiChat}>
@@ -546,11 +547,19 @@ function App() {
     setIsAiChatOpen(true);
   }
 
+  function animateAiChatClose() {
+    setIsAiChatClosing(true);
+    window.setTimeout(() => {
+      setIsAiChatOpen(false);
+      setIsAiChatClosing(false);
+    }, 220);
+  }
+
   function closeAiChat() {
     const shouldPopHistory = aiChatHistoryPushedRef.current;
     isAiChatOpenRef.current = false;
     aiChatHistoryPushedRef.current = false;
-    setIsAiChatOpen(false);
+    animateAiChatClose();
     if (shouldPopHistory) {
       window.history.back();
     }
@@ -569,6 +578,10 @@ function App() {
       fabLongPressTimerRef.current = undefined;
       fabSuppressClickRef.current = true;
       openAiChat();
+      // 弹窗打开后那次 click 可能不会派发到按钮，定时自动复位防误触标记
+      window.setTimeout(() => {
+        fabSuppressClickRef.current = false;
+      }, 400);
     }, 500);
   }
 
@@ -1430,6 +1443,9 @@ function AiChatView({
         next.add(messageId);
         return next;
       });
+      window.setTimeout(() => {
+        suppressClickRef.current = false;
+      }, 400);
     }, 500);
   }
 
