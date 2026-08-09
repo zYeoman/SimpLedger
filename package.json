@@ -18,6 +18,8 @@
     "@capacitor/app": "^8.1.1",
     "@capacitor/cli": "^8.5.0",
     "@capacitor/core": "^8.5.0",
+    "@capacitor/filesystem": "^8.1.2",
+    "@capacitor/share": "^8.0.1",
     "@vitejs/plugin-react": "^5.0.0",
     "antd-mobile": "^5.42.3",
     "dexie": "^4.0.11",

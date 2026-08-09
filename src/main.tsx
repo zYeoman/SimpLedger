@@ -3,6 +3,8 @@ import { createPortal } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { useLiveQuery } from "dexie-react-hooks";
 import { App as CapacitorApp } from "@capacitor/app";
+import { Directory, Filesystem } from "@capacitor/filesystem";
+import { Share } from "@capacitor/share";
 import {
   addSavedQuery,
   isAiConfigured,
@@ -3748,6 +3750,7 @@ function SettingsView({
   const [updateUrl, setUpdateUrl] = useState("");
   const [aiConfig, setAiConfig] = useState<AiConfig>(loadAiConfig);
   const [isAiSettingsOpen, setIsAiSettingsOpen] = useState(false);
+  const [exportStatus, setExportStatus] = useState("");
   const [webdavStatus, setWebdavStatus] = useState("");
   const [webdavConfig, setWebdavConfig] = useState<WebdavConfig>(loadWebdavConfig);
   const [isWebdavSettingsOpen, setIsWebdavSettingsOpen] = useState(false);
@@ -3785,13 +3788,34 @@ function SettingsView({
   ]);
 
   async function downloadBackup() {
-    const payload = await exportBackup();
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `local-money-${fileSafeStamp()}.json`;
-    link.click();
-    URL.revokeObjectURL(link.href);
+    setExportStatus("");
+    try {
+      const payload = await exportBackup();
+      const json = JSON.stringify(payload, null, 2);
+      const fileName = `local-money-${fileSafeStamp()}.json`;
+      if (__CAPACITOR__) {
+        // App 内 WebView 不支持 a[download]，改为写入缓存目录并调起系统分享
+        const result = await Filesystem.writeFile({
+          path: fileName,
+          data: json,
+          directory: Directory.Cache,
+        });
+        await Share.share({
+          title: "账本备份",
+          files: [result.uri],
+          dialogTitle: "导出 JSON 备份",
+        });
+      } else {
+        const blob = new Blob([json], { type: "application/json" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = fileName;
+        link.click();
+        URL.revokeObjectURL(link.href);
+      }
+    } catch (error) {
+      setExportStatus(error instanceof Error ? `导出失败：${error.message}` : "导出失败");
+    }
   }
 
   async function handleImport(event: React.ChangeEvent<HTMLInputElement>) {
@@ -3993,6 +4017,7 @@ function SettingsView({
           </button>
           <input ref={fileRef} hidden type="file" accept="application/json" onChange={handleImport} />
         </div>
+        {exportStatus && <p className="setting-hint">{exportStatus}</p>}
         <div className="button-row webdav-action-row">
           <button className="secondary-button" onClick={backupToWebdav}>
             <Upload size={18} />
