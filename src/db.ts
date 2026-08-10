@@ -30,6 +30,7 @@ export type Account = {
   name: string;
   kind?: AccountKind;
   createdAt: string;
+  sortOrder?: number;
 };
 
 export type RecurringFrequency = "daily" | "weekday" | "weekend" | "weekly" | "monthly" | "yearly";

@@ -246,11 +246,11 @@ function App() {
   const [themeColor, setThemeColor] = useState(readThemeColor);
   const [isSeedReady, setIsSeedReady] = useState(false);
   const categoryRows = useLiveQuery(() => db.categories.orderBy("type").toArray(), []);
-  const accountRows = useLiveQuery(() => db.accounts.orderBy("createdAt").toArray(), []);
+  const accountRows = useLiveQuery(() => db.accounts.toArray(), []);
   const transactionRows = useLiveQuery(() => db.transactions.orderBy("date").reverse().toArray(), []);
   const transferRuleRows = useLiveQuery(() => db.transferRules.orderBy("createdAt").toArray(), []);
   const categories = categoryRows ?? [];
-  const accounts = accountRows ?? [];
+  const accounts = useMemo(() => sortAccounts(accountRows ?? []), [accountRows]);
   const transactions = transactionRows ?? [];
   const transferRules = transferRuleRows ?? [];
   const isDataReady = isSeedReady && categoryRows !== undefined && accountRows !== undefined && transactionRows !== undefined && transferRuleRows !== undefined;
@@ -694,6 +694,16 @@ function titleForView(view: View) {
 
 function transactionBelongsToAccount(item: Transaction, account: string) {
   return (item.account || defaultAccounts[0]) === account || (item.type === "transfer" && item.toAccount === account);
+}
+
+/** 账户按 sortOrder 排序，未设置 sortOrder 的排最后（按创建时间兜底） */
+function sortAccounts(accounts: Account[]): Account[] {
+  return [...accounts].sort((a, b) => {
+    const orderA = a.sortOrder ?? Number.MAX_SAFE_INTEGER;
+    const orderB = b.sortOrder ?? Number.MAX_SAFE_INTEGER;
+    if (orderA !== orderB) return orderA - orderB;
+    return (a.createdAt || "").localeCompare(b.createdAt || "");
+  });
 }
 
 type AccountBalanceRow = {
@@ -4232,22 +4242,58 @@ function AccountSettingsPanel({
 }) {
   const [newAccount, setNewAccount] = useState("");
   const [newAccountKind, setNewAccountKind] = useState<AccountKind>("cash");
+  const [reorderTarget, setReorderTarget] = useState<string | null>(null);
+  const longPressTimerRef = useRef<number | undefined>(undefined);
   const accountRecords: Account[] = accounts.length
     ? accounts
     : defaultAccounts.map((name) => ({ name, kind: inferAccountKind(name), createdAt: "" }));
   const accountNames = accountRecords.map((item) => item.name);
 
+  function startAccountLongPress(name: string) {
+    longPressTimerRef.current = window.setTimeout(() => {
+      setReorderTarget(name);
+    }, 500);
+  }
+
+  function clearAccountLongPress() {
+    if (longPressTimerRef.current !== undefined) {
+      window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = undefined;
+    }
+  }
+
   async function addAccount(event: React.FormEvent) {
     event.preventDefault();
     const name = newAccount.trim();
     if (!name || accountNames.includes(name)) return;
-    await db.accounts.add({ name, kind: newAccountKind, createdAt: new Date().toISOString() });
+    const maxOrder = accountRecords.reduce((max, item) => Math.max(max, item.sortOrder ?? -1), -1);
+    await db.accounts.add({ name, kind: newAccountKind, createdAt: new Date().toISOString(), sortOrder: maxOrder + 1 });
     setNewAccount("");
   }
 
   async function deleteAccount(id: number | undefined, dependencyCount: number) {
     if (!id || dependencyCount > 0) return;
     await db.accounts.delete(id);
+  }
+
+  async function moveAccount(name: string, direction: -1 | 1) {
+    const sorted = sortAccounts(accountRecords);
+    const from = sorted.findIndex((item) => item.name === name);
+    const to = from + direction;
+    if (from < 0 || to < 0 || to >= sorted.length) return;
+    // 默认账户没有 db 记录，无法持久化排序，跳过
+    if (!sorted[from].id || !sorted[to].id) return;
+    const next = [...sorted];
+    [next[from], next[to]] = [next[to], next[from]];
+    await db.transaction("rw", db.accounts, async () => {
+      for (let i = 0; i < next.length; i++) {
+        const account = next[i];
+        if (account.id != null) {
+          await db.accounts.update(account.id, { sortOrder: i });
+        }
+      }
+    });
+    setReorderTarget(null);
   }
 
   return (
@@ -4265,7 +4311,14 @@ function AccountSettingsPanel({
           const categoryCount = categories.filter((category) => category.defaultAccount === account.name).length;
           const dependencyCount = usageCount + ruleCount + categoryCount;
           return (
-            <article className="account-settings-row" key={account.name}>
+            <article
+              className={`account-settings-row ${reorderTarget === account.name ? "reorder-target" : ""}`}
+              key={account.name}
+              onPointerDown={() => startAccountLongPress(account.name)}
+              onPointerUp={clearAccountLongPress}
+              onPointerLeave={clearAccountLongPress}
+              onPointerCancel={clearAccountLongPress}
+            >
               <div>
                 <strong>{account.name}</strong>
                 <span>
@@ -4287,6 +4340,20 @@ function AccountSettingsPanel({
           );
         })}
       </div>
+      {reorderTarget && (
+        <div className="reorder-toolbar">
+          <span>已选 {reorderTarget}</span>
+          <button type="button" className="reorder-action" onClick={() => moveAccount(reorderTarget, -1)}>
+            上移
+          </button>
+          <button type="button" className="reorder-action" onClick={() => moveAccount(reorderTarget, 1)}>
+            下移
+          </button>
+          <button type="button" className="reorder-cancel" onClick={() => setReorderTarget(null)}>
+            取消
+          </button>
+        </div>
+      )}
     </div>
   );
 }
