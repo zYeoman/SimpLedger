@@ -277,16 +277,18 @@ function App() {
     if (!__CAPACITOR__) return;
     // 安卓返回键：有应用内状态（弹层/记一笔页/非首页）时回退一页，
     // 让现有 popstate 逻辑处理；在首页且无状态时才退出到桌面。
-    CapacitorApp.addListener("backButton", ({ canGoBack }) => {
+    CapacitorApp.addListener("backButton", () => {
       const hasAppState =
         isEntryOpenRef.current ||
         isAiChatOpenRef.current ||
         viewRef.current !== "home" ||
         activeHistoryPopupTokens.size > 0;
-      if (canGoBack || hasAppState) {
+      if (hasAppState) {
         window.history.back();
       } else {
-        // 首页无状态时退到后台而不是销毁 Activity，和按主页键一致，重开不会重新加载
+        // 首页无状态时直接退到后台而不是销毁 Activity，和按主页键一致，重开不会重新加载。
+        // 不能依赖 canGoBack：滑动切换 tab 时 pushState 会积累 history 条目，
+        // 即使回到首页 canGoBack 仍为 true，会导致返回键要按多次才退出。
         CapacitorApp.minimizeApp();
       }
     });
