@@ -5,9 +5,9 @@
 ## P0 — 正确性 bug
 
 - [ ] AI 回复静默丢失：聊天页关闭后 `appendMessage` 落在已卸载组件上（`src/main.tsx:1535-1670`，`handleSend`/`handleRetry`）
-- [ ] 导入备份无确认、无 try/catch，且追加式导入会产生重复交易（`src/main.tsx:3886-3892`）
+- [ ] 本地文件导入是覆盖式（`src/db.ts:284-288` 先 clear 再 bulkAdd），但 `handleImport` 无"将覆盖本地数据"确认提示、无 try/catch（坏 JSON 变 unhandled rejection）；WebDAV/Cloudflare 恢复路径都有确认，应对齐（`src/main.tsx:3886-3892`）
 - [ ] WebDAV 备份遇中文用户名 `btoa()` 直接崩溃（`src/webdav.ts:95`）
-- [ ] 多处 `setTimeout` 卸载时未清理（`src/main.tsx:1684, 1495, 3676, 554`）
+- [ ] ~~多处 `setTimeout` 卸载时未清理（`src/main.tsx:1684, 1495, 3676, 554`）~~ 评估后不改：React 19 下已卸载组件的 setState 是静默 no-op，无实际影响
 - [x] ~~`chineseNumber` 不支持"二十三"等 20 以上组合~~ — 已通过 AI prompt 强制阿拉伯数字规避（`src/ai.ts:107`）；残留：手动输入中文数字仍无法识别，可给 `chineseNumber` 加 `X十Y` 支持（`src/query.ts:181`）
 
 ## P1 — 健壮性/安全小修
