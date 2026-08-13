@@ -294,6 +294,25 @@ function App() {
     });
   }, []);
 
+  // 周期规则只在冷启动执行，App 常驻后台跨天不会触发；
+  // 回到前台时补跑一次，到期的周期记账按 lastRunDate 追平，不会重复
+  useEffect(() => {
+    const runAutoTransfers = () => {
+      applyAutoTransfers().catch(() => undefined);
+    };
+    if (__CAPACITOR__) {
+      CapacitorApp.addListener("appStateChange", (state) => {
+        if (state.isActive) runAutoTransfers();
+      });
+      return;
+    }
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") runAutoTransfers();
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, []);
+
   useEffect(() => {
     isEntryOpenRef.current = isEntryOpen;
   }, [isEntryOpen]);
