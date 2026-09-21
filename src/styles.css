@@ -961,7 +961,6 @@ h1 {
   line-height: 1.15;
   overflow: hidden;
   text-align: right;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 

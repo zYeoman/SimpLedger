@@ -2365,6 +2365,20 @@ function EntryForm({
   const [date, setDate] = useState(transaction?.date ?? todayInputValue());
   const [note, setNote] = useState(transaction?.note ?? "");
   const [entryRecurringConfig, setEntryRecurringConfig] = useState<EntryRecurringConfig | null>(null);
+  const amountOutputRef = useRef<HTMLOutputElement>(null);
+  const [amountOutputWidth, setAmountOutputWidth] = useState(0);
+
+  // 金额（含算式）太长时自动缩小字号，避免被截断成省略号
+  useEffect(() => {
+    const output = amountOutputRef.current;
+    if (!output) return;
+    const updateWidth = () => setAmountOutputWidth(output.clientWidth);
+    updateWidth();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(output);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     if (type === "transfer") return;
@@ -2487,6 +2501,12 @@ function EntryForm({
   const dateLabel = entryRecurringSummary || formatEntryDateLabel(date);
   const dateValue = new Date(`${date}T00:00:00`);
   const hasAmountExpression = /[+-]/.test(amount);
+  const amountText = amount || "0.00";
+  // 金额（含算式）按可用宽度反推字号：等宽数字约占 0.6em，最长缩到 14px
+  const amountFontSize =
+    amountOutputWidth > 0
+      ? Math.min(42, Math.max(14, Math.floor(amountOutputWidth / (amountText.length * 0.6))))
+      : 42;
 
   function calculateAmountInPlace() {
     const value = evaluateAmountExpression(amount);
@@ -2574,7 +2594,9 @@ function EntryForm({
         </div>
         <label className="field amount-field">
           <span>金额</span>
-          <output>{amount || "0.00"}</output>
+          <output ref={amountOutputRef} style={{ fontSize: `${amountFontSize}px` }}>
+            {amountText}
+          </output>
         </label>
         <div className="number-pad" aria-label="金额数字键盘">
           {["1", "2", "3"].map((key) => (
