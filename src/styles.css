@@ -1015,6 +1015,36 @@ h1 {
   align-content: center;
 }
 
+/* 历史备注候选 */
+.note-suggestions {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.note-suggestions::-webkit-scrollbar {
+  display: none;
+}
+
+.note-suggestion {
+  flex: 0 0 auto;
+  min-height: 30px;
+  border: 1px solid #d8d2c5;
+  border-radius: 999px;
+  background: #f7f3ec;
+  color: #27322f;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.note-suggestion:active {
+  background: #eee6d8;
+}
+
 .number-pad {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

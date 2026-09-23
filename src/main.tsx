@@ -493,7 +493,7 @@ function App() {
               </button>
             </div>
             {isDataReady ? (
-              <EntryForm categories={categories} accounts={accounts} transaction={editingTransaction} onDone={closeEntryPage} />
+              <EntryForm categories={categories} accounts={accounts} transactions={transactions} transaction={editingTransaction} onDone={closeEntryPage} />
             ) : (
               <LoadingState />
             )}
@@ -2345,11 +2345,13 @@ function Metric({ icon, label, value, tone }: { icon?: React.ReactNode; label: s
 function EntryForm({
   categories,
   accounts,
+  transactions,
   transaction,
   onDone,
 }: {
   categories: ReturnType<typeof useCategories>;
   accounts: Account[];
+  transactions: Transaction[];
   transaction: Transaction | null;
   onDone: () => void;
 }) {
@@ -2500,6 +2502,29 @@ function EntryForm({
   const entryRecurringSummary = entryRecurringConfig ? formatRecurringConfigSummary(entryRecurringConfig) : "";
   const dateLabel = entryRecurringSummary || formatEntryDateLabel(date);
   const dateValue = new Date(`${date}T00:00:00`);
+  // 备注候选：同一记账类型 + 类别下的历史备注，去重后按「使用次数多的优先，
+  // 次数相同则最近用过的优先」排序，最多 8 个（transactions 已按日期倒序）
+  const noteSuggestions = useMemo(() => {
+    const stats = new Map<string, { count: number; latest: number }>();
+    const currentNote = note.trim();
+    transactions.forEach((item, index) => {
+      if (item.type !== type) return;
+      if (type !== "transfer" && item.category !== category) return;
+      const text = item.note?.trim();
+      if (!text || text === currentNote) return;
+      const existing = stats.get(text);
+      if (existing) {
+        existing.count += 1;
+        existing.latest = Math.min(existing.latest, index);
+      } else {
+        stats.set(text, { count: 1, latest: index });
+      }
+    });
+    return [...stats.entries()]
+      .sort((a, b) => b[1].count - a[1].count || a[1].latest - b[1].latest)
+      .slice(0, 8)
+      .map(([text]) => text);
+  }, [transactions, type, category, note]);
   const hasAmountExpression = /[+-]/.test(amount);
   const amountText = amount || "0.00";
   // 金额（含算式）按可用宽度反推字号：等宽数字约占 0.6em，最长缩到 14px
@@ -2592,6 +2617,15 @@ function EntryForm({
             <input name="note" placeholder="备注" value={note} onChange={(event) => setNote(event.target.value)} />
           </label>
         </div>
+        {noteSuggestions.length > 0 && (
+          <div className="note-suggestions" aria-label="历史备注">
+            {noteSuggestions.map((item) => (
+              <button type="button" key={item} className="note-suggestion" onClick={() => setNote(item)}>
+                {item}
+              </button>
+            ))}
+          </div>
+        )}
         <label className="field amount-field">
           <span>金额</span>
           <output ref={amountOutputRef} style={{ fontSize: `${amountFontSize}px` }}>
