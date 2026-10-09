@@ -4320,16 +4320,66 @@ function SettingsView({
           </button>
         </div>
       </div>
-      <Popup visible={isAccountSettingsOpen} onMaskClick={closeAccountSettings} bodyClassName="management-popup">
-        <AccountSettingsPanel accounts={accounts} transactions={transactions} transferRules={transferRules} categories={categories} />
-      </Popup>
-      <Popup visible={isTransferRulesOpen} onMaskClick={closeTransferRules} bodyClassName="management-popup">
-        <RecurringRulesPanel accounts={accounts} categories={categories} transferRules={transferRules} />
-      </Popup>
-      <Popup visible={isCategorySettingsOpen} onMaskClick={closeCategorySettings} bodyClassName="management-popup">
-        <CategorySettingsPanel categories={categories} transactions={transactions} accounts={accounts} />
-      </Popup>
+      {isAccountSettingsOpen && (
+        <ScreenPage
+          title="账户设置"
+          meta={`${accounts.length || defaultAccounts.length} 个账户`}
+          onClose={closeAccountSettings}
+        >
+          <AccountSettingsPanel accounts={accounts} transactions={transactions} transferRules={transferRules} categories={categories} />
+        </ScreenPage>
+      )}
+      {isTransferRulesOpen && (
+        <ScreenPage title="周期记账" meta={`${transferRules.length} 条规则`} onClose={closeTransferRules}>
+          <RecurringRulesPanel accounts={accounts} categories={categories} transferRules={transferRules} />
+        </ScreenPage>
+      )}
+      {isCategorySettingsOpen && (
+        <ScreenPage title="分类设置" meta={`${categories.length} 个分类`} onClose={closeCategorySettings}>
+          <CategorySettingsPanel categories={categories} transactions={transactions} accounts={accounts} />
+        </ScreenPage>
+      )}
     </section>
+  );
+}
+
+/** 全屏页：与记一笔页、统计详情页同一套范式（fixed 铺满 + 上升/下沉动画），替代底部半浮 sheet */
+function ScreenPage({
+  title,
+  meta,
+  onClose,
+  children,
+}: {
+  title: string;
+  meta?: string;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  const [isClosing, setIsClosing] = useState(false);
+
+  function requestClose() {
+    if (isClosing) return;
+    setIsClosing(true);
+    window.setTimeout(onClose, 200);
+  }
+
+  return createPortal(
+    // 必须 portal 到 body：Swiper 容器带 transform，会变成 fixed 的包含块，页面就铺不满
+    <section className={`screen-page ${isClosing ? "leaving" : ""}`} aria-label={title}>
+      <div className="screen-page-inner">
+        <header className="screen-page-header">
+          <div className="screen-page-heading">
+            <h2>{title}</h2>
+            {meta ? <em>{meta}</em> : null}
+          </div>
+          <button type="button" className="screen-page-close" aria-label="关闭" onClick={requestClose}>
+            <X size={22} />
+          </button>
+        </header>
+        <div className="screen-page-body">{children}</div>
+      </div>
+    </section>,
+    document.body
   );
 }
 
@@ -4346,6 +4396,8 @@ function AccountSettingsPanel({
 }) {
   const [newAccount, setNewAccount] = useState("");
   const [newAccountKind, setNewAccountKind] = useState<AccountKind>("cash");
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const closeAdd = useHistoryBackedPopup(isAddOpen, setIsAddOpen, "localMoneyAccountAdd");
   const [reorderTarget, setReorderTarget] = useState<string | null>(null);
   const longPressTimerRef = useRef<number | undefined>(undefined);
   const accountRecords: Account[] = accounts.length
@@ -4378,6 +4430,7 @@ function AccountSettingsPanel({
       sortOrder: maxOrder + 1,
     });
     setNewAccount("");
+    closeAdd();
   }
 
   async function changeAccountKind(id: number | undefined, kind: AccountKind) {
@@ -4415,37 +4468,12 @@ function AccountSettingsPanel({
   const canAddAccount = trimmedAccountName !== "" && !duplicateName;
 
   return (
-    <div className="management-panel">
-      <div className="panel-title-row">
-        <span className="popup-title">账户设置</span>
-        <em className="panel-count">{accountRecords.length} 个账户</em>
-      </div>
+    <div className="screen-page-content">
       <p className="setting-hint">长按账户可上移/下移排序</p>
-
-      <form className="account-add-card" onSubmit={addAccount}>
-        <div className="account-add-head">
-          <span>添加账户</span>
-        </div>
-        <label className="account-field">
-          <span>账户名称</span>
-          <input
-            className="account-add-input"
-            placeholder="如 招行储蓄卡"
-            value={newAccount}
-            onChange={(event) => setNewAccount(event.target.value)}
-          />
-        </label>
-        <div className="account-field">
-          <span>账户类型</span>
-          <AccountKindToggle value={newAccountKind} onChange={setNewAccountKind} />
-        </div>
-        {!canAddAccount && (
-          <p className="account-add-note">{duplicateName ? "已有同名账户，换一个名字" : "填写账户名称后即可添加"}</p>
-        )}
-        <button type="submit" className="account-add-submit" disabled={!canAddAccount}>
-          添加账户
-        </button>
-      </form>
+      <button type="button" className="account-add-open" onClick={() => setIsAddOpen(true)}>
+        <Plus size={18} />
+        <span>添加账户</span>
+      </button>
       <div className="asset-list">
         {accountRecords.map((account) => {
           const kind = accountKindOf(account);
@@ -4507,6 +4535,40 @@ function AccountSettingsPanel({
           </button>
         </div>
       )}
+      <CenterPopup visible={isAddOpen} onMaskClick={closeAdd} bodyClassName="account-add-dialog">
+        <form className="account-add-form" onSubmit={addAccount}>
+          <div className="account-add-head">
+            <h3>添加账户</h3>
+            <button type="button" className="account-add-close" aria-label="关闭" onClick={closeAdd}>
+              <X size={20} />
+            </button>
+          </div>
+          <label className="account-field">
+            <span>账户名称</span>
+            <input
+              className="account-add-input"
+              placeholder="如 招行储蓄卡"
+              value={newAccount}
+              onChange={(event) => setNewAccount(event.target.value)}
+            />
+          </label>
+          <div className="account-field">
+            <span>账户类型</span>
+            <AccountKindToggle value={newAccountKind} onChange={setNewAccountKind} />
+          </div>
+          {!canAddAccount && (
+            <p className="account-add-note">{duplicateName ? "已有同名账户，换一个名字" : "填写账户名称后即可添加"}</p>
+          )}
+          <div className="account-add-actions">
+            <button type="button" className="account-add-cancel" onClick={closeAdd}>
+              取消
+            </button>
+            <button type="submit" className="account-add-submit" disabled={!canAddAccount}>
+              添加账户
+            </button>
+          </div>
+        </form>
+      </CenterPopup>
     </div>
   );
 }
@@ -4569,8 +4631,7 @@ function RecurringRulesPanel({
   const closeEditor = useHistoryBackedPopup(isEditorOpen, setIsEditorOpen, "localMoneyRecurringEditor");
 
   return (
-    <div className="management-panel">
-      <div className="popup-title">周期记账</div>
+    <div className="screen-page-content">
       <button type="button" className="secondary-button full-width-button" onClick={() => setIsEditorOpen(true)}>
         新建周期记账
       </button>
@@ -4596,9 +4657,11 @@ function RecurringRulesPanel({
           ))
         )}
       </div>
-      <Popup visible={isEditorOpen} onMaskClick={closeEditor} bodyClassName="management-popup recurring-editor-popup">
-        <RecurringRuleEditor accounts={accounts} categories={categories} onDone={closeEditor} />
-      </Popup>
+      {isEditorOpen && (
+        <ScreenPage title="新建周期记账" onClose={closeEditor}>
+          <RecurringRuleEditor accounts={accounts} categories={categories} onDone={closeEditor} />
+        </ScreenPage>
+      )}
     </div>
   );
 }
@@ -4683,8 +4746,7 @@ function RecurringRuleEditor({
   }
 
   return (
-    <div className="management-panel">
-      <div className="popup-title">新建周期记账</div>
+    <div className="screen-page-content">
       <form className="recurring-rule-form" onSubmit={addRecurringRule}>
         <div className="recurring-field">
           <span>类型</span>
@@ -4885,8 +4947,7 @@ function CategorySettingsPanel({
   }
 
   return (
-    <div className="management-panel">
-      <div className="popup-title">分类设置</div>
+    <div className="screen-page-content">
       <div className="category-manage-tabs">
         <button type="button" className={categoryManageType === "expense" ? "selected" : ""} onClick={() => setCategoryManageType("expense")}>
           支出

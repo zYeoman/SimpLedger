@@ -535,32 +535,6 @@ h1 {
   width: 100%;
 }
 
-.management-popup {
-  display: flex;
-  max-height: min(82dvh, 680px);
-  flex-direction: column;
-  border-radius: 16px 16px 0 0;
-  background: #f7f3ec;
-  padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
-}
-
-.management-panel {
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: none;
-}
-
-.management-panel::-webkit-scrollbar {
-  display: none;
-}
-
-.recurring-editor-popup {
-  height: 100dvh;
-  max-height: none;
-  border-radius: 0;
-}
-
 .entry-form {
   height: calc(100dvh - 80px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
   min-height: 0;
@@ -1428,7 +1402,7 @@ h1 {
   gap: 14px;
   border: 1px solid #e6ded1;
   border-radius: 8px;
-  background: #fff;
+  background: #fffaf2;
   padding: 14px;
   box-shadow: 0 8px 20px rgba(64, 51, 37, 0.08);
 }
@@ -2059,7 +2033,7 @@ h1 {
   border: 1px solid #e6ded1;
   border-left: 6px solid var(--swatch);
   border-radius: 8px;
-  background: #fff;
+  background: #fffaf2;
   padding: 8px 10px;
   font-weight: 700;
 }
@@ -2110,7 +2084,7 @@ h1 {
   min-width: 0;
   border: 1px solid #e6ded1;
   border-radius: 8px;
-  background: #fff;
+  background: #fffaf2;
   color: #27322f;
   padding: 8px;
   font-weight: 700;
@@ -2138,7 +2112,7 @@ h1 {
   align-items: center;
   border: 1px solid #e6ded1;
   border-radius: 8px;
-  background: #fff;
+  background: #fffaf2;
   padding: 10px;
 }
 
@@ -2253,11 +2227,13 @@ h1 {
   max-height: min(76dvh, 620px);
   flex-direction: column;
   border-radius: 16px 16px 0 0;
+  background: #f7f3ec;
   padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
 }
 
 .color-picker-popup {
   border-radius: 16px 16px 0 0;
+  background: #f7f3ec;
   padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
 }
 
@@ -2518,7 +2494,7 @@ h1 {
   gap: 12px;
   border: 1px solid #e6ded1;
   border-radius: 8px;
-  background: #fff;
+  background: #fffaf2;
   padding: 12px;
 }
 
@@ -3536,51 +3512,27 @@ h1 {
 }
 
 /* 管理弹层标题：标题 + 计数 */
-.panel-title-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.panel-title-row .popup-title {
-  margin-bottom: 0;
-}
-
-.panel-count {
-  color: #77807b;
-  font-size: 12px;
-  font-style: normal;
-  font-weight: 800;
-}
-
 /* 添加账户卡片 */
-.account-add-card {
-  display: grid;
-  gap: 12px;
-  margin: 12px 0;
-  border: 1px solid #e6ded1;
-  border-radius: 12px;
-  background: #fffaf2;
-  padding: 12px;
-}
-
 .account-add-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 8px;
+}
+
+.account-add-head h3 {
+  margin: 0;
   color: #27322f;
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 900;
 }
 
-.account-add-head em {
-  color: #c24b5a;
-  font-size: 12px;
-  font-style: normal;
-  font-weight: 800;
+.account-add-close {
+  display: grid;
+  place-items: center;
+  padding: 2px;
+  background: transparent;
+  color: #77807b;
 }
 
 .account-field {
@@ -3595,22 +3547,22 @@ h1 {
   font-weight: 900;
 }
 
-.account-add-card input {
+.account-add-form input {
   min-width: 0;
   min-height: 40px;
   border: 1px solid #e6ded1;
   border-radius: 8px;
-  background: #fff;
+  background: transparent;
   padding: 0 12px;
   color: #27322f;
   font-weight: 800;
 }
 
-.account-add-card input::placeholder {
+.account-add-form input::placeholder {
   color: #8f9792;
 }
 
-.account-add-card input:focus {
+.account-add-form input:focus {
   border-color: var(--theme-primary);
   outline: 0;
   box-shadow: 0 0 0 2px rgba(47, 111, 94, 0.12);
@@ -3625,6 +3577,7 @@ h1 {
 }
 
 .account-add-submit {
+  flex: 1.4;
   min-height: 44px;
   border-radius: 10px;
   background: var(--theme-primary);
@@ -3655,7 +3608,7 @@ h1 {
   min-height: 40px;
   border: 1px solid #e6ded1;
   border-radius: 10px;
-  background: #fff;
+  background: transparent;
   color: #4d5753;
   font-size: 13px;
   font-weight: 800;
@@ -3679,7 +3632,7 @@ h1 {
   gap: 2px;
   border: 1px solid #e6ded1;
   border-radius: 10px;
-  background: #fff;
+  background: transparent;
   padding: 3px;
 }
 
@@ -3782,3 +3735,131 @@ h1 {
   cursor: not-allowed;
 }
 
+/* 全屏管理页：与记一笔页同一套范式 */
+.screen-page {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  justify-items: center;
+  background: #f7f3ec;
+  animation: page-rise 220ms ease-out;
+}
+
+.screen-page.leaving {
+  animation: page-sink 220ms ease-in forwards;
+}
+
+.screen-page-inner {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: min(100%, 520px);
+  height: 100dvh;
+  max-height: 100dvh;
+  padding: calc(10px + env(safe-area-inset-top)) 16px calc(18px + env(safe-area-inset-bottom));
+}
+
+.screen-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e3dbce;
+}
+
+.screen-page-heading {
+  display: grid;
+  gap: 2px;
+}
+
+.screen-page-heading h2 {
+  margin: 0;
+  color: #27322f;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.screen-page-heading em {
+  color: #77807b;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.screen-page-close {
+  display: grid;
+  place-items: center;
+  padding: 4px;
+  background: transparent;
+  color: #27322f;
+}
+
+.screen-page-body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  padding-top: 14px;
+}
+
+.screen-page-body::-webkit-scrollbar {
+  display: none;
+}
+
+.screen-page-content {
+  display: grid;
+  gap: 12px;
+}
+
+/* antd 弹层默认白底与暖色系冲突：只在弹层内换背景变量，不动全站 */
+.adm-popup-body,
+.adm-center-popup-body {
+  --adm-color-background: #f7f3ec;
+  background-color: var(--adm-color-background);
+}
+
+/* 添加账户：入口按钮 + 居中弹窗 */
+.account-add-open {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  border: 1px solid #e6ded1;
+  border-radius: 12px;
+  background: #fffaf2;
+  color: var(--theme-primary);
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.account-add-dialog {
+  width: min(92vw, 420px);
+  border-radius: 14px;
+  background: #fffaf2;
+  padding: 16px;
+}
+
+.account-add-form {
+  display: grid;
+  gap: 12px;
+  max-height: min(78dvh, 620px);
+  overflow-y: auto;
+}
+
+.account-add-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.account-add-cancel {
+  flex: 1;
+  min-height: 44px;
+  border: 1px solid #e6ded1;
+  border-radius: 10px;
+  background: transparent;
+  color: #4d5753;
+  font-size: 14px;
+  font-weight: 800;
+}
