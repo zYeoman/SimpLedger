@@ -4383,6 +4383,14 @@ function ScreenPage({
   );
 }
 
+type AccountDraft = {
+  id?: number;
+  name: string;
+  kind: AccountKind;
+  originalName?: string;
+  originalKind?: AccountKind;
+};
+
 function AccountSettingsPanel({
   accounts,
   transactions,
@@ -4394,16 +4402,29 @@ function AccountSettingsPanel({
   transferRules: TransferRule[];
   categories: ReturnType<typeof useCategories>;
 }) {
-  const [newAccount, setNewAccount] = useState("");
-  const [newAccountKind, setNewAccountKind] = useState<AccountKind>("cash");
-  const [isAddOpen, setIsAddOpen] = useState(false);
-  const closeAdd = useHistoryBackedPopup(isAddOpen, setIsAddOpen, "localMoneyAccountAdd");
+  const [draft, setDraft] = useState<AccountDraft | null>(null);
   const [reorderTarget, setReorderTarget] = useState<string | null>(null);
   const longPressTimerRef = useRef<number | undefined>(undefined);
+  const closeDraft = useHistoryBackedPopup(
+    draft !== null,
+    (visible) => {
+      if (!visible) setDraft(null);
+    },
+    "localMoneyAccountDraft"
+  );
   const accountRecords: Account[] = accounts.length
     ? accounts
     : defaultAccounts.map((name) => ({ name, kind: inferAccountKind(name), createdAt: "" }));
   const accountNames = accountRecords.map((item) => item.name);
+  const editingAccount = draft?.id != null ? accountRecords.find((item) => item.id === draft.id) : undefined;
+  const editingDependencies = editingAccount ? accountDependencyCount(editingAccount.name) : 0;
+
+  function accountDependencyCount(name: string) {
+    const usageCount = transactions.filter((item) => transactionBelongsToAccount(item, name)).length;
+    const ruleCount = transferRules.filter((rule) => (rule.account || rule.fromAccount) === name || rule.toAccount === name).length;
+    const categoryCount = categories.filter((category) => category.defaultAccount === name).length;
+    return usageCount + ruleCount + categoryCount;
+  }
 
   function startAccountLongPress(name: string) {
     longPressTimerRef.current = window.setTimeout(() => {
@@ -4418,29 +4439,71 @@ function AccountSettingsPanel({
     }
   }
 
-  async function addAccount(event: React.FormEvent) {
-    event.preventDefault();
-    const name = newAccount.trim();
-    if (!name || accountNames.includes(name)) return;
-    const maxOrder = accountRecords.reduce((max, item) => Math.max(max, item.sortOrder ?? -1), -1);
-    await db.accounts.add({
-      name,
-      kind: newAccountKind,
-      createdAt: new Date().toISOString(),
-      sortOrder: maxOrder + 1,
-    });
-    setNewAccount("");
-    closeAdd();
+  function openAddDraft() {
+    setDraft({ name: "", kind: "cash" });
   }
 
-  async function changeAccountKind(id: number | undefined, kind: AccountKind) {
-    if (!id) return;
+  function openEditDraft(account: Account) {
+    const kind = accountKindOf(account);
+    setDraft({
+      id: account.id,
+      name: account.name,
+      kind,
+      originalName: account.name,
+      originalKind: kind,
+    });
+  }
+
+  /** 改名要把引用一起改掉，否则流水/周期规则/分类默认账户会指向一个不存在的账户 */
+  async function renameAccount(id: number, from: string, to: string) {
+    await db.transaction("rw", db.accounts, db.transactions, db.transferRules, db.categories, async () => {
+      await db.accounts.update(id, { name: to });
+      await db.transactions.where("account").equals(from).modify((item) => {
+        item.account = to;
+      });
+      await db.transactions.where("toAccount").equals(from).modify((item) => {
+        item.toAccount = to;
+      });
+      await db.transferRules.toCollection().modify((rule) => {
+        if (rule.account === from) rule.account = to;
+        if (rule.fromAccount === from) rule.fromAccount = to;
+        if (rule.toAccount === from) rule.toAccount = to;
+      });
+      await db.categories.toCollection().modify((category) => {
+        if (category.defaultAccount === from) category.defaultAccount = to;
+      });
+    });
+  }
+
+  async function changeAccountKind(id: number, kind: AccountKind) {
     await db.accounts.update(id, { kind });
   }
 
-  async function deleteAccount(id: number | undefined, dependencyCount: number) {
-    if (!id || dependencyCount > 0) return;
-    await db.accounts.delete(id);
+  async function saveDraft(event: React.FormEvent) {
+    event.preventDefault();
+    if (!draft) return;
+    const name = draft.name.trim();
+    if (!name || !canSaveDraft) return;
+
+    if (draft.id == null) {
+      const maxOrder = accountRecords.reduce((max, item) => Math.max(max, item.sortOrder ?? -1), -1);
+      await db.accounts.add({
+        name,
+        kind: draft.kind,
+        createdAt: new Date().toISOString(),
+        sortOrder: maxOrder + 1,
+      });
+    } else {
+      if (draft.originalName && draft.originalName !== name) await renameAccount(draft.id, draft.originalName, name);
+      if (draft.kind !== draft.originalKind) await changeAccountKind(draft.id, draft.kind);
+    }
+    closeDraft();
+  }
+
+  async function deleteDraftAccount() {
+    if (draft?.id == null || editingDependencies > 0) return;
+    await db.accounts.delete(draft.id);
+    closeDraft();
   }
 
   async function moveAccount(name: string, direction: -1 | 1) {
@@ -4463,14 +4526,14 @@ function AccountSettingsPanel({
     setReorderTarget(null);
   }
 
-  const trimmedAccountName = newAccount.trim();
-  const duplicateName = trimmedAccountName !== "" && accountNames.includes(trimmedAccountName);
-  const canAddAccount = trimmedAccountName !== "" && !duplicateName;
+  const trimmedDraftName = draft?.name.trim() ?? "";
+  const duplicateDraftName = trimmedDraftName !== "" && accountNames.some((name) => name === trimmedDraftName && name !== draft?.originalName);
+  const canSaveDraft = trimmedDraftName !== "" && !duplicateDraftName;
 
   return (
     <div className="screen-page-content">
       <p className="setting-hint">长按账户可上移/下移排序</p>
-      <button type="button" className="account-add-open" onClick={() => setIsAddOpen(true)}>
+      <button type="button" className="account-add-open" onClick={openAddDraft}>
         <Plus size={18} />
         <span>添加账户</span>
       </button>
@@ -4480,7 +4543,13 @@ function AccountSettingsPanel({
           const usageCount = transactions.filter((item) => transactionBelongsToAccount(item, account.name)).length;
           const ruleCount = transferRules.filter((rule) => (rule.account || rule.fromAccount) === account.name || rule.toAccount === account.name).length;
           const categoryCount = categories.filter((category) => category.defaultAccount === account.name).length;
-          const dependencyCount = usageCount + ruleCount + categoryCount;
+          const meta = [
+            `${usageCount} 笔记录`,
+            `${ruleCount} 条规则`,
+            categoryCount > 0 ? `${categoryCount} 个默认分类` : "",
+          ]
+            .filter(Boolean)
+            .join(" · ");
           return (
             <article
               className={`account-row ${reorderTarget === account.name ? "reorder-target" : ""}`}
@@ -4496,27 +4565,19 @@ function AccountSettingsPanel({
                 </span>
                 <div className="account-row-main">
                   <strong>{account.name}</strong>
-                  <span>
-                    {usageCount} 笔记录 · {ruleCount} 条规则
-                    {categoryCount > 0 ? ` · ${categoryCount} 个默认分类` : ""}
-                  </span>
+                  <span>{meta}</span>
                 </div>
                 <button
                   type="button"
-                  className="account-row-delete"
-                  disabled={dependencyCount > 0}
-                  title={dependencyCount > 0 ? "该账户还有记录、规则或默认分类，先清空再删除" : `删除 ${account.name}`}
-                  onClick={() => deleteAccount(account.id, dependencyCount)}
+                  className="account-row-edit"
+                  disabled={!account.id}
+                  title={account.id ? `编辑 ${account.name}` : "默认账户，先添加一次后再编辑"}
+                  aria-label={`编辑 ${account.name}`}
+                  onClick={() => openEditDraft(account)}
                 >
-                  删除
+                  <ChevronRight size={18} />
                 </button>
               </div>
-              <AccountKindToggle
-                value={kind}
-                variant="inline"
-                disabled={!account.id}
-                onChange={(nextKind) => changeAccountKind(account.id, nextKind)}
-              />
             </article>
           );
         })}
@@ -4535,11 +4596,11 @@ function AccountSettingsPanel({
           </button>
         </div>
       )}
-      <CenterPopup visible={isAddOpen} onMaskClick={closeAdd} bodyClassName="account-add-dialog">
-        <form className="account-add-form" onSubmit={addAccount}>
+      <CenterPopup visible={draft !== null} onMaskClick={closeDraft} bodyClassName="account-add-dialog">
+        <form className="account-add-form" onSubmit={saveDraft}>
           <div className="account-add-head">
-            <h3>添加账户</h3>
-            <button type="button" className="account-add-close" aria-label="关闭" onClick={closeAdd}>
+            <h3>{draft?.id == null ? "添加账户" : "编辑账户"}</h3>
+            <button type="button" className="account-add-close" aria-label="关闭" onClick={closeDraft}>
               <X size={20} />
             </button>
           </div>
@@ -4548,23 +4609,34 @@ function AccountSettingsPanel({
             <input
               className="account-add-input"
               placeholder="如 招行储蓄卡"
-              value={newAccount}
-              onChange={(event) => setNewAccount(event.target.value)}
+              value={draft?.name ?? ""}
+              onChange={(event) => setDraft((current) => (current ? { ...current, name: event.target.value } : current))}
             />
           </label>
           <div className="account-field">
             <span>账户类型</span>
-            <AccountKindToggle value={newAccountKind} onChange={setNewAccountKind} />
+            <AccountKindToggle
+              value={draft?.kind ?? "cash"}
+              onChange={(kind) => setDraft((current) => (current ? { ...current, kind } : current))}
+            />
           </div>
-          {!canAddAccount && (
-            <p className="account-add-note">{duplicateName ? "已有同名账户，换一个名字" : "填写账户名称后即可添加"}</p>
+          {!canSaveDraft && (
+            <p className="account-add-note">{duplicateDraftName ? "已有同名账户，换一个名字" : "填写账户名称后即可保存"}</p>
+          )}
+          {draft?.id != null && editingDependencies > 0 && (
+            <p className="account-add-note">该账户还有 {editingDependencies} 处记录 / 规则 / 默认分类，清空后才能删除</p>
+          )}
+          {draft?.id != null && editingDependencies === 0 && (
+            <button type="button" className="account-add-delete" onClick={deleteDraftAccount}>
+              删除这个账户
+            </button>
           )}
           <div className="account-add-actions">
-            <button type="button" className="account-add-cancel" onClick={closeAdd}>
+            <button type="button" className="account-add-cancel" onClick={closeDraft}>
               取消
             </button>
-            <button type="submit" className="account-add-submit" disabled={!canAddAccount}>
-              添加账户
+            <button type="submit" className="account-add-submit" disabled={!canSaveDraft}>
+              {draft?.id == null ? "添加账户" : "保存"}
             </button>
           </div>
         </form>
@@ -4577,20 +4649,13 @@ function AccountKindToggle({
   value,
   onChange,
   disabled = false,
-  variant = "chips",
 }: {
   value: AccountKind;
   onChange: (value: AccountKind) => void;
   disabled?: boolean;
-  variant?: "chips" | "inline";
 }) {
   return (
-    <div
-      className={`account-kind-toggle ${variant} ${disabled ? "disabled" : ""}`}
-      role="group"
-      aria-label="账户类型"
-      onPointerDown={(event) => event.stopPropagation()}
-    >
+    <div className={`account-kind-toggle ${disabled ? "disabled" : ""}`} role="group" aria-label="账户类型">
       {accountKinds.map((kind) => (
         <button
           type="button"
