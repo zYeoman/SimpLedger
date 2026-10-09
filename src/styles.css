@@ -53,6 +53,30 @@ button {
   cursor: pointer;
 }
 
+/* 输入框唯一基类：新输入框加 .text-input 即可，不要再写「.某组件 input」的盒模型 */
+.text-input {
+  min-width: 0;
+  min-height: 40px;
+  border: 1px solid #e6ded1;
+  border-radius: 8px;
+  background: #fffaf2;
+  padding: 0 12px;
+  color: #27322f;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.text-input::placeholder {
+  color: #8f9792;
+}
+
+.text-input:focus {
+  border-color: var(--theme-primary);
+  outline: 0;
+  box-shadow: 0 0 0 2px rgba(47, 111, 94, 0.12);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--theme-primary) 12%, transparent);
+}
+
 .app-shell {
   width: min(100%, 520px);
   min-height: 100vh;
@@ -2079,17 +2103,6 @@ h1 {
   grid-column: 1 / -1;
 }
 
-.category-add-form input,
-.category-add-form select {
-  min-width: 0;
-  border: 1px solid #e6ded1;
-  border-radius: 8px;
-  background: #fffaf2;
-  color: #27322f;
-  padding: 8px;
-  font-weight: 700;
-}
-
 .category-add-form input[type="color"] {
   width: 42px;
   height: 36px;
@@ -3244,9 +3257,7 @@ h1 {
   opacity: 0.55;
 }
 
-.ai-save-query:focus,
-.ai-save-form input:focus,
-.ai-input-row input:focus {
+.ai-save-query:focus {
   border-color: var(--theme-primary);
   outline: 0;
   box-shadow: 0 0 0 2px rgba(47, 111, 94, 0.12);
@@ -3266,18 +3277,8 @@ h1 {
 .ai-save-form input {
   flex: 1;
   min-width: 0;
-  min-height: 38px;
-  border: 1px solid #e6ded1;
-  border-radius: 8px;
-  background: #fffaf2;
-  color: #27322f;
-  font-weight: 700;
-  padding: 0 10px;
   font-size: 13px;
-}
-
-.ai-save-form input::placeholder {
-  color: #8f9792;
+  font-weight: 700;
 }
 
 .ai-save-form button {
@@ -3408,18 +3409,6 @@ h1 {
 .ai-input-row input {
   flex: 1;
   min-width: 0;
-  min-height: 42px;
-  border: 1px solid #e6ded1;
-  border-radius: 8px;
-  background: #fffaf2;
-  color: #27322f;
-  font-weight: 700;
-  padding: 0 14px;
-  font-size: 14px;
-}
-
-.ai-input-row input::placeholder {
-  color: #8f9792;
 }
 
 .ai-input-row button {
@@ -3545,11 +3534,6 @@ h1 {
   color: #77807b;
   font-size: 12px;
   font-weight: 900;
-}
-
-.account-add-form input,
-.account-add-form input::placeholder {
-  color: #8f9792;
 }
 
 .account-add-note {

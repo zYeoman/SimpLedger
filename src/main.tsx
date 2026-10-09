@@ -1788,6 +1788,7 @@ function AiChatView({
             {savingForId === message.id && !message.saved && message.query && (
               <div className="ai-save-form">
                 <input
+                  className="text-input"
                   value={savingName}
                   placeholder="给这个查询起个名字"
                   onChange={(event) => setSavingName(event.target.value)}
@@ -1816,6 +1817,7 @@ function AiChatView({
       )}
       <div className="ai-input-row">
         <input
+          className="text-input"
           value={input}
           placeholder="用自然语言问，比如：上个月交通花了多少"
           onChange={(event) => setInput(event.target.value)}
@@ -4607,7 +4609,7 @@ function AccountSettingsPanel({
           <label className="account-field">
             <span>账户名称</span>
             <input
-              className="account-add-input"
+              className="text-input"
               placeholder="如 招行储蓄卡"
               value={draft?.name ?? ""}
               onChange={(event) => setDraft((current) => (current ? { ...current, name: event.target.value } : current))}
@@ -5022,7 +5024,7 @@ function CategorySettingsPanel({
         </button>
       </div>
       <form className="category-add-form" onSubmit={addCategory}>
-        <input placeholder="新增分类" value={newCategoryName} onChange={(event) => setNewCategoryName(event.target.value)} />
+        <input className="text-input" placeholder="新增分类" value={newCategoryName} onChange={(event) => setNewCategoryName(event.target.value)} />
         <CategoryDefaultAccountButton value={newCategoryDefaultAccount} accounts={accountNames} onChange={setNewCategoryDefaultAccount} />
         <ColorPicker value={newCategoryColor} onChange={setNewCategoryColor} />
         <IconPicker value={newCategoryIcon} color={newCategoryColor} onChange={setNewCategoryIcon} />
