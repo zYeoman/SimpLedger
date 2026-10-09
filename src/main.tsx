@@ -165,6 +165,18 @@ const typeLabel: Record<TransactionType, string> = {
   transfer: "转账",
 };
 
+const accountKinds: AccountKind[] = ["cash", "investment"];
+
+const accountKindSwatch: Record<AccountKind, string> = {
+  cash: "var(--theme-primary)",
+  investment: "#4776b4",
+};
+
+function AccountKindIcon({ kind, size = 20 }: { kind: AccountKind; size?: number }) {
+  if (kind === "investment") return <TrendingUp size={size} />;
+  return <Wallet size={size} />;
+}
+
 function readHomeAccountFilters() {
   if (typeof window === "undefined") return [];
   try {
@@ -257,9 +269,11 @@ function App() {
 
   useEffect(() => {
     let isActive = true;
-    seedCategories().then(() => applyAutoTransfers()).finally(() => {
-      if (isActive) setIsSeedReady(true);
-    });
+    seedCategories()
+      .then(() => applyAutoTransfers())
+      .finally(() => {
+        if (isActive) setIsSeedReady(true);
+      });
     if ("serviceWorker" in navigator) {
       if (__CAPACITOR__) {
         // 原生 App 内资源已打包进 APK，不需要 Service Worker，反而会带来旧缓存问题
@@ -297,17 +311,17 @@ function App() {
   // 周期规则只在冷启动执行，App 常驻后台跨天不会触发；
   // 回到前台时补跑一次，到期的周期记账按 lastRunDate 追平，不会重复
   useEffect(() => {
-    const runAutoTransfers = () => {
+    const runScheduledBookkeeping = () => {
       applyAutoTransfers().catch(() => undefined);
     };
     if (__CAPACITOR__) {
       CapacitorApp.addListener("appStateChange", (state) => {
-        if (state.isActive) runAutoTransfers();
+        if (state.isActive) runScheduledBookkeeping();
       });
       return;
     }
     const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") runAutoTransfers();
+      if (document.visibilityState === "visible") runScheduledBookkeeping();
     };
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
@@ -745,6 +759,7 @@ function buildAccountBalanceRows(items: Transaction[], accounts: Account[]): Acc
     : defaultAccounts.map((name) => ({ name, kind: inferAccountKind(name), createdAt: "" }));
   return accountRecords.map((accountRecord) => {
     const account = accountRecord.name;
+    const kind = accountKindOf(accountRecord);
     const accountItems = items.filter((item) => transactionBelongsToAccount(item, account));
     const income = sumByType(accountItems.filter((item) => item.type !== "transfer"), "income");
     const expense = sumByType(accountItems.filter((item) => item.type !== "transfer"), "expense");
@@ -759,7 +774,7 @@ function buildAccountBalanceRows(items: Transaction[], accounts: Account[]): Acc
       balance: income + transferIn - expense - transferOut,
       count: accountItems.length,
       id: accountRecord.id,
-      kind: accountKindOf(accountRecord),
+      kind,
     };
   });
 }
@@ -2991,15 +3006,18 @@ function almanacRefreshKey(date = new Date()) {
   return `${day}-${hourIndex}`;
 }
 
+/** 交易所属账户的类型：账户表优先，未登记的账户名按关键词推断 */
+function transactionAccountKind(item: Transaction, accountKindByName: Map<string, AccountKind>) {
+  const account = item.account || defaultAccounts[0];
+  return accountKindByName.get(account) ?? inferAccountKind(account);
+}
+
 function buildAssetRunwayMetrics(items: Transaction[], accounts: Account[]) {
-  const accountKindByName = new Map(accounts.map((account) => [account.name, accountKindOf(account)]));
-  const ordinaryItems = items
-    .filter((item) => item.type !== "transfer")
-    .filter((item) => (accountKindByName.get(item.account || defaultAccounts[0]) ?? inferAccountKind(item.account || defaultAccounts[0])) !== "investment");
+  const ordinaryItems = items.filter((item) => item.type !== "transfer");
   const averageDayCount = statsAverageDayCount("all", monthKey(), String(new Date().getFullYear()), ordinaryItems);
   const dailyExpense = sumByType(ordinaryItems, "expense") / averageDayCount;
   const dailyIncome = sumByType(ordinaryItems, "income") / averageDayCount;
-  const totalBalance = buildAccountBalanceRows(items, accounts).reduce((sum, item) => sum + item.balance, 0);
+  const totalBalance = buildAccountBalanceRows(items, accounts).reduce((sum, row) => sum + row.balance, 0);
   return {
     dailyExpense,
     dailyIncome,
@@ -3205,8 +3223,6 @@ function softColor(hex: string) {
 function AssetsView({ items, accounts }: { items: Transaction[]; accounts: Account[] }) {
   const rows = buildAccountBalanceRows(items, accounts);
   const total = rows.reduce((sum, item) => sum + item.balance, 0);
-  const cashTotal = rows.filter((item) => item.kind === "cash").reduce((sum, item) => sum + item.balance, 0);
-  const investmentTotal = rows.filter((item) => item.kind === "investment").reduce((sum, item) => sum + item.balance, 0);
   const totalAbsBalance = rows.reduce((sum, item) => sum + Math.abs(item.balance), 0);
   const runway = buildAssetRunwayMetrics(items, accounts);
 
@@ -3237,7 +3253,7 @@ function AssetsView({ items, accounts }: { items: Transaction[]; accounts: Accou
       <div className="panel">
         <div className="asset-list">
           {rows.map((row) => {
-            const flowGroups = [
+            const flowGroups: [string, string][][] = [
               [
                 ["收入", formatAmountPlain(row.income)],
                 ["支出", formatAmountPlain(row.expense)],
@@ -3251,9 +3267,11 @@ function AssetsView({ items, accounts }: { items: Transaction[]; accounts: Accou
               <article
                 className="asset-row"
                 key={row.account}
-                style={{ "--swatch": row.kind === "investment" ? "#4776b4" : "var(--theme-primary)" } as React.CSSProperties}
+                style={{ "--swatch": accountKindSwatch[row.kind] } as React.CSSProperties}
               >
-                <div className="asset-row-icon">{row.kind === "investment" ? <TrendingUp /> : <Wallet />}</div>
+                <div className="asset-row-icon">
+                  <AccountKindIcon kind={row.kind} />
+                </div>
                 <div className="asset-row-main">
                   <strong>{row.account}</strong>
                   <span>
@@ -3348,11 +3366,11 @@ function StatsView({
   }
   const accountKindByName = new Map(accounts.map((account) => [account.name, accountKindOf(account)]));
   const allNonTransferItems = allItems.filter((item) => item.type !== "transfer");
-  const allOrdinaryItems = allNonTransferItems.filter((item) => (accountKindByName.get(item.account || defaultAccounts[0]) ?? inferAccountKind(item.account || defaultAccounts[0])) !== "investment");
-  const allInvestmentItems = allNonTransferItems.filter((item) => (accountKindByName.get(item.account || defaultAccounts[0]) ?? inferAccountKind(item.account || defaultAccounts[0])) === "investment");
+  const allOrdinaryItems = allNonTransferItems.filter((item) => transactionAccountKind(item, accountKindByName) === "cash");
+  const allInvestmentItems = allNonTransferItems.filter((item) => transactionAccountKind(item, accountKindByName) === "investment");
   const nonTransferItems = items.filter((item) => item.type !== "transfer");
-  const ordinaryItems = nonTransferItems.filter((item) => (accountKindByName.get(item.account || defaultAccounts[0]) ?? inferAccountKind(item.account || defaultAccounts[0])) !== "investment");
-  const investmentItems = nonTransferItems.filter((item) => (accountKindByName.get(item.account || defaultAccounts[0]) ?? inferAccountKind(item.account || defaultAccounts[0])) === "investment");
+  const ordinaryItems = nonTransferItems.filter((item) => transactionAccountKind(item, accountKindByName) === "cash");
+  const investmentItems = nonTransferItems.filter((item) => transactionAccountKind(item, accountKindByName) === "investment");
   const expenseTotal = sumByType(ordinaryItems, "expense");
   const incomeTotal = sumByType(ordinaryItems, "income");
   const investmentExpense = sumByType(investmentItems, "expense");
@@ -3380,7 +3398,7 @@ function StatsView({
         </div>
       </div>
       {investmentItems.length > 0 && (
-        <div className="stats-summary investment-stats-summary">
+        <div className="stats-summary secondary-stats-summary">
           <div>
             <span>理财支出</span>
             <strong className="expense" title={currency.format(investmentExpense)} style={fitStatsAmountStyle(investmentExpense)}>{currency.format(investmentExpense)}</strong>
@@ -4277,19 +4295,28 @@ function SettingsView({
         </div>
         <div className="settings-action-list">
           <button type="button" className="settings-action-button" onClick={() => setIsAccountSettingsOpen(true)}>
-            <Wallet size={18} />
+            <span className="settings-action-icon">
+              <Wallet size={18} />
+            </span>
             <span>账户设置</span>
             <em>{accounts.length || defaultAccounts.length} 个</em>
+            <ChevronRight size={16} className="settings-action-chevron" />
           </button>
           <button type="button" className="settings-action-button" onClick={() => setIsTransferRulesOpen(true)}>
-            <ArrowRightLeft size={18} />
+            <span className="settings-action-icon">
+              <ArrowRightLeft size={18} />
+            </span>
             <span>周期记账</span>
             <em>{transferRules.length} 条</em>
+            <ChevronRight size={16} className="settings-action-chevron" />
           </button>
           <button type="button" className="settings-action-button" onClick={() => setIsCategorySettingsOpen(true)}>
-            <Tags size={18} />
+            <span className="settings-action-icon">
+              <Tags size={18} />
+            </span>
             <span>分类设置</span>
             <em>{categories.length} 个</em>
+            <ChevronRight size={16} className="settings-action-chevron" />
           </button>
         </div>
       </div>
@@ -4344,8 +4371,18 @@ function AccountSettingsPanel({
     const name = newAccount.trim();
     if (!name || accountNames.includes(name)) return;
     const maxOrder = accountRecords.reduce((max, item) => Math.max(max, item.sortOrder ?? -1), -1);
-    await db.accounts.add({ name, kind: newAccountKind, createdAt: new Date().toISOString(), sortOrder: maxOrder + 1 });
+    await db.accounts.add({
+      name,
+      kind: newAccountKind,
+      createdAt: new Date().toISOString(),
+      sortOrder: maxOrder + 1,
+    });
     setNewAccount("");
+  }
+
+  async function changeAccountKind(id: number | undefined, kind: AccountKind) {
+    if (!id) return;
+    await db.accounts.update(id, { kind });
   }
 
   async function deleteAccount(id: number | undefined, dependencyCount: number) {
@@ -4373,46 +4410,85 @@ function AccountSettingsPanel({
     setReorderTarget(null);
   }
 
+  const trimmedAccountName = newAccount.trim();
+  const duplicateName = trimmedAccountName !== "" && accountNames.includes(trimmedAccountName);
+  const canAddAccount = trimmedAccountName !== "" && !duplicateName;
+
   return (
     <div className="management-panel">
-      <div className="popup-title">账户设置</div>
-      <form className="asset-add-form" onSubmit={addAccount}>
-        <input placeholder="新增资产账户" value={newAccount} onChange={(event) => setNewAccount(event.target.value)} />
-        <AccountKindToggle value={newAccountKind} onChange={setNewAccountKind} />
-        <button type="submit">添加</button>
+      <div className="panel-title-row">
+        <span className="popup-title">账户设置</span>
+        <em className="panel-count">{accountRecords.length} 个账户</em>
+      </div>
+      <p className="setting-hint">长按账户可上移/下移排序</p>
+
+      <form className="account-add-card" onSubmit={addAccount}>
+        <div className="account-add-head">
+          <span>添加账户</span>
+        </div>
+        <label className="account-field">
+          <span>账户名称</span>
+          <input
+            className="account-add-input"
+            placeholder="如 招行储蓄卡"
+            value={newAccount}
+            onChange={(event) => setNewAccount(event.target.value)}
+          />
+        </label>
+        <div className="account-field">
+          <span>账户类型</span>
+          <AccountKindToggle value={newAccountKind} onChange={setNewAccountKind} />
+        </div>
+        {!canAddAccount && (
+          <p className="account-add-note">{duplicateName ? "已有同名账户，换一个名字" : "填写账户名称后即可添加"}</p>
+        )}
+        <button type="submit" className="account-add-submit" disabled={!canAddAccount}>
+          添加账户
+        </button>
       </form>
       <div className="asset-list">
         {accountRecords.map((account) => {
+          const kind = accountKindOf(account);
           const usageCount = transactions.filter((item) => transactionBelongsToAccount(item, account.name)).length;
           const ruleCount = transferRules.filter((rule) => (rule.account || rule.fromAccount) === account.name || rule.toAccount === account.name).length;
           const categoryCount = categories.filter((category) => category.defaultAccount === account.name).length;
           const dependencyCount = usageCount + ruleCount + categoryCount;
           return (
             <article
-              className={`account-settings-row ${reorderTarget === account.name ? "reorder-target" : ""}`}
+              className={`account-row ${reorderTarget === account.name ? "reorder-target" : ""}`}
               key={account.name}
               onPointerDown={() => startAccountLongPress(account.name)}
               onPointerUp={clearAccountLongPress}
               onPointerLeave={clearAccountLongPress}
               onPointerCancel={clearAccountLongPress}
             >
-              <div>
-                <strong>{account.name}</strong>
-                <span>
-                  {usageCount} 笔记录 · {ruleCount} 条规则
-                  {categoryCount > 0 ? ` · ${categoryCount} 个默认分类` : ""}
+              <div className="account-row-head">
+                <span className="account-row-icon" style={{ "--chip": accountKindSwatch[kind] } as React.CSSProperties}>
+                  <AccountKindIcon kind={kind} size={18} />
                 </span>
-              </div>
-              <div className="asset-actions">
-                <AccountKindToggle
-                  value={accountKindOf(account)}
-                  disabled={!account.id}
-                  onChange={(kind) => account.id && db.accounts.update(account.id, { kind })}
-                />
-                <button type="button" className="asset-delete" disabled={dependencyCount > 0} onClick={() => deleteAccount(account.id, dependencyCount)}>
+                <div className="account-row-main">
+                  <strong>{account.name}</strong>
+                  <span>
+                    {usageCount} 笔记录 · {ruleCount} 条规则
+                    {categoryCount > 0 ? ` · ${categoryCount} 个默认分类` : ""}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className="account-row-delete"
+                  disabled={dependencyCount > 0}
+                  title={dependencyCount > 0 ? "该账户还有记录、规则或默认分类，先清空再删除" : `删除 ${account.name}`}
+                  onClick={() => deleteAccount(account.id, dependencyCount)}
+                >
                   删除
                 </button>
               </div>
+              <AccountKindToggle
+                value={kind}
+                variant="inline"
+                disabled={!account.id}
+                onChange={(nextKind) => changeAccountKind(account.id, nextKind)}
+              />
             </article>
           );
         })}
@@ -4439,16 +4515,32 @@ function AccountKindToggle({
   value,
   onChange,
   disabled = false,
+  variant = "chips",
 }: {
   value: AccountKind;
   onChange: (value: AccountKind) => void;
   disabled?: boolean;
+  variant?: "chips" | "inline";
 }) {
   return (
-    <div className={`account-kind-toggle ${disabled ? "disabled" : ""}`} aria-label="账户类型">
-      {(["cash", "investment"] as AccountKind[]).map((kind) => (
-        <button type="button" key={kind} className={value === kind ? "selected" : ""} disabled={disabled} onClick={() => onChange(kind)}>
-          {accountKindLabel[kind]}
+    <div
+      className={`account-kind-toggle ${variant} ${disabled ? "disabled" : ""}`}
+      role="group"
+      aria-label="账户类型"
+      onPointerDown={(event) => event.stopPropagation()}
+    >
+      {accountKinds.map((kind) => (
+        <button
+          type="button"
+          key={kind}
+          className={value === kind ? "selected" : ""}
+          style={{ "--chip": accountKindSwatch[kind] } as React.CSSProperties}
+          disabled={disabled}
+          aria-pressed={value === kind}
+          onClick={() => onChange(kind)}
+        >
+          <AccountKindIcon kind={kind} size={16} />
+          <span>{accountKindLabel[kind]}</span>
         </button>
       ))}
     </div>

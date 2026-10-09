@@ -480,12 +480,12 @@ h1 {
 
 .settings-action-button {
   display: grid;
-  grid-template-columns: 24px minmax(0, 1fr) auto;
+  grid-template-columns: 32px minmax(0, 1fr) auto 16px;
   align-items: center;
   gap: 10px;
-  min-height: 50px;
+  min-height: 56px;
   border: 1px solid #e6ded1;
-  border-radius: 8px;
+  border-radius: 12px;
   background: #fffaf2;
   color: #27322f;
   padding: 0 12px;
@@ -494,6 +494,20 @@ h1 {
 
 .settings-action-button span {
   font-weight: 900;
+}
+
+.settings-action-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: #eef3ee;
+  color: var(--theme-primary);
+}
+
+.settings-action-chevron {
+  color: #b6bcb8;
 }
 
 .settings-action-button em {
@@ -1576,7 +1590,7 @@ h1 {
   gap: 10px;
 }
 
-.investment-stats-summary {
+.secondary-stats-summary {
   margin-top: -6px;
 }
 
@@ -2374,47 +2388,6 @@ h1 {
   gap: 10px;
 }
 
-.asset-add-form {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 128px 72px;
-  gap: 8px;
-  margin-bottom: 14px;
-  border: 1px solid #e6ded1;
-  border-radius: 8px;
-  background: #fffaf2;
-  padding: 10px;
-}
-
-.asset-add-form input,
-.transfer-rule-form input,
-.transfer-rule-form select {
-  min-width: 0;
-  border: 1px solid #e6ded1;
-  border-radius: 8px;
-  background: #fffaf2;
-  padding: 0 12px;
-  color: #27322f;
-}
-
-.asset-add-form input {
-  min-height: 42px;
-  font-weight: 800;
-}
-
-.asset-add-form input::placeholder {
-  color: #8f9792;
-}
-
-.asset-add-form input:focus,
-.transfer-rule-form input:focus,
-.transfer-rule-form select:focus {
-  border-color: var(--theme-primary);
-  outline: 0;
-  box-shadow: 0 0 0 2px rgba(47, 111, 94, 0.12);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--theme-primary) 12%, transparent);
-}
-
-.asset-add-form button,
 .transfer-rule-form button,
 .asset-delete {
   min-height: 42px;
@@ -2423,36 +2396,6 @@ h1 {
   color: #fff;
   padding: 0 12px;
   font-weight: 800;
-}
-
-.account-kind-toggle {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 4px;
-  min-height: 42px;
-  border: 1px solid #e6ded1;
-  border-radius: 8px;
-  background: #fffaf2;
-  padding: 4px;
-}
-
-.account-kind-toggle button {
-  min-height: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: #4d5753;
-  padding: 0 8px;
-  font-size: 13px;
-  font-weight: 900;
-}
-
-.account-kind-toggle button.selected {
-  background: var(--theme-primary);
-  color: #fff;
-}
-
-.account-kind-toggle.disabled {
-  opacity: 0.54;
 }
 
 .recurring-rule-form {
@@ -2593,38 +2536,6 @@ h1 {
   margin-top: 4px;
   color: #77807b;
   font-size: 12px;
-}
-
-.account-settings-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 12px;
-  border: 1px solid #e6ded1;
-  border-radius: 8px;
-  padding: 12px;
-}
-
-.account-settings-row strong,
-.account-settings-row span {
-  display: block;
-}
-
-.account-settings-row strong {
-  color: #27322f;
-  font-size: 15px;
-}
-
-.account-settings-row span {
-  margin-top: 4px;
-  color: #77807b;
-  font-size: 12px;
-}
-
-.account-settings-row.reorder-target {
-  border-color: var(--theme-primary);
-  outline: 2px solid var(--theme-primary);
-  outline-offset: 1px;
 }
 
 .reorder-toolbar {
@@ -2885,12 +2796,10 @@ h1 {
     width: 100%;
   }
 
-  .asset-add-form,
   .transfer-rule-form {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .asset-add-form input,
   .transfer-rule-form select {
     grid-column: 1 / -1;
   }
@@ -3625,3 +3534,251 @@ h1 {
   background: #eef0e7;
   color: #27322f;
 }
+
+/* 管理弹层标题：标题 + 计数 */
+.panel-title-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.panel-title-row .popup-title {
+  margin-bottom: 0;
+}
+
+.panel-count {
+  color: #77807b;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+/* 添加账户卡片 */
+.account-add-card {
+  display: grid;
+  gap: 12px;
+  margin: 12px 0;
+  border: 1px solid #e6ded1;
+  border-radius: 12px;
+  background: #fffaf2;
+  padding: 12px;
+}
+
+.account-add-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  color: #27322f;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.account-add-head em {
+  color: #c24b5a;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.account-field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.account-field > span {
+  color: #77807b;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.account-add-card input {
+  min-width: 0;
+  min-height: 40px;
+  border: 1px solid #e6ded1;
+  border-radius: 8px;
+  background: #fff;
+  padding: 0 12px;
+  color: #27322f;
+  font-weight: 800;
+}
+
+.account-add-card input::placeholder {
+  color: #8f9792;
+}
+
+.account-add-card input:focus {
+  border-color: var(--theme-primary);
+  outline: 0;
+  box-shadow: 0 0 0 2px rgba(47, 111, 94, 0.12);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--theme-primary) 12%, transparent);
+}
+
+.account-add-note {
+  margin: 0;
+  color: #77807b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.account-add-submit {
+  min-height: 44px;
+  border-radius: 10px;
+  background: var(--theme-primary);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.account-add-submit:disabled {
+  cursor: not-allowed;
+  border: 1px solid #e2ddd3;
+  background: #f2efe8;
+  color: #b0b6b1;
+}
+
+/* 账户类型选择：图标 + 名称的胶囊，用账户色标区分 */
+.account-kind-toggle {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.account-kind-toggle button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  border: 1px solid #e6ded1;
+  border-radius: 10px;
+  background: #fff;
+  color: #4d5753;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.account-kind-toggle button svg {
+  color: #9aa19c;
+}
+
+.account-kind-toggle button.selected {
+  border-color: transparent;
+  background: var(--chip);
+  color: #fff;
+}
+
+.account-kind-toggle button.selected svg {
+  color: #fff;
+}
+
+.account-kind-toggle.inline {
+  gap: 2px;
+  border: 1px solid #e6ded1;
+  border-radius: 10px;
+  background: #fff;
+  padding: 3px;
+}
+
+.account-kind-toggle.inline button {
+  min-height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #77807b;
+  font-size: 12px;
+}
+
+.account-kind-toggle.inline button svg {
+  color: #a3a9a4;
+}
+
+.account-kind-toggle.inline button.selected {
+  background: color-mix(in srgb, var(--chip) 16%, #fff);
+  color: var(--chip);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--chip) 32%, transparent);
+}
+
+.account-kind-toggle.inline button.selected svg {
+  color: var(--chip);
+}
+
+/* 账户行更紧凑：类型选择跟内容同一节奏 */
+.account-row .account-kind-toggle.inline button {
+  min-height: 28px;
+}
+
+.account-kind-toggle.disabled {
+  opacity: 0.54;
+}
+
+/* 账户行 */
+.account-row {
+  display: grid;
+  gap: 8px;
+  border: 1px solid #e6ded1;
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.account-row.reorder-target {
+  border-color: var(--theme-primary);
+  outline: 2px solid var(--theme-primary);
+  outline-offset: 1px;
+}
+
+.account-row-head {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.account-row-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--chip) 14%, #fff);
+  color: var(--chip);
+}
+
+.account-row-main {
+  min-width: 0;
+}
+
+.account-row-main strong,
+.account-row-main span {
+  display: block;
+}
+
+.account-row-main strong {
+  color: #27322f;
+  font-size: 15px;
+}
+
+.account-row-main span {
+  margin-top: 2px;
+  color: #77807b;
+  font-size: 12px;
+}
+
+.account-row-delete {
+  min-height: 30px;
+  border-radius: 8px;
+  background: transparent;
+  color: #c24b5a;
+  padding: 0 8px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.account-row-delete:disabled {
+  color: #c6cbc7;
+  cursor: not-allowed;
+}
+
