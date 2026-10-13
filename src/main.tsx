@@ -113,10 +113,21 @@ import {
   applyAutoTransfers,
   db,
   defaultAccounts,
+  ensureProvidentCategories,
   exportBackup,
+  findProvidentDepositRule,
+  findProvidentWithdrawRule,
   importBackup,
   inferAccountKind,
+  providentBackfillCount,
+  providentDepositCategory,
+  providentInterestCategory,
+  providentNeedsSettlement,
+  providentPeriodStart,
+  removeProvidentRules,
   seedCategories,
+  upsertProvidentDepositRule,
+  upsertProvidentWithdrawRule,
   type Account,
   type AccountKind,
   type BackupPayload,
@@ -165,15 +176,17 @@ const typeLabel: Record<TransactionType, string> = {
   transfer: "转账",
 };
 
-const accountKinds: AccountKind[] = ["cash", "investment"];
+const accountKinds: AccountKind[] = ["cash", "investment", "provident"];
 
 const accountKindSwatch: Record<AccountKind, string> = {
   cash: "var(--theme-primary)",
   investment: "#4776b4",
+  provident: "#c28a2c",
 };
 
 function AccountKindIcon({ kind, size = 20 }: { kind: AccountKind; size?: number }) {
   if (kind === "investment") return <TrendingUp size={size} />;
+  if (kind === "provident") return <Landmark size={size} />;
   return <Wallet size={size} />;
 }
 
@@ -257,6 +270,10 @@ function App() {
   const [homeAccountFilters, setHomeAccountFilters] = useState<string[]>(readHomeAccountFilters);
   const [themeColor, setThemeColor] = useState(readThemeColor);
   const [isSeedReady, setIsSeedReady] = useState(false);
+  // 回前台时 +1，让待结息检查按新日期重算（跨天后 today 变化但 accounts 不变）
+  const [scheduleTick, setScheduleTick] = useState(0);
+  // 「暂不处理」后本次运行不再提醒结息，下次启动再检查
+  const [settlementDismissed, setSettlementDismissed] = useState(false);
   const categoryRows = useLiveQuery(() => db.categories.orderBy("type").toArray(), []);
   const accountRows = useLiveQuery(() => db.accounts.toArray(), []);
   const transactionRows = useLiveQuery(() => db.transactions.orderBy("date").reverse().toArray(), []);
@@ -270,6 +287,7 @@ function App() {
   useEffect(() => {
     let isActive = true;
     seedCategories()
+      .then(() => ensureProvidentCategories())
       .then(() => applyAutoTransfers())
       .finally(() => {
         if (isActive) setIsSeedReady(true);
@@ -308,11 +326,13 @@ function App() {
     });
   }, []);
 
-  // 周期规则只在冷启动执行，App 常驻后台跨天不会触发；
-  // 回到前台时补跑一次，到期的周期记账按 lastRunDate 追平，不会重复
+  // 周期记账只在冷启动执行，App 常驻后台跨天不会触发；
+  // 回到前台时补跑一次，到期的周期记账按 lastRunDate 追平，不会重复；
+  // 同时重查待结息的公积金账户（每年 7/1 起提醒手动结息）
   useEffect(() => {
     const runScheduledBookkeeping = () => {
       applyAutoTransfers().catch(() => undefined);
+      setScheduleTick((tick) => tick + 1);
     };
     if (__CAPACITOR__) {
       CapacitorApp.addListener("appStateChange", (state) => {
@@ -423,6 +443,13 @@ function App() {
     if (statsMode === "all") return transactions;
     return transactions.filter((item) => item.date.startsWith(`${statsYear}-`));
   }, [statsMode, statsMonth, statsYear, transactions]);
+  // 每年 7/1 起提醒公积金手动结息，逐个账户处理；确认后 accounts 变化会自动切到下一个
+  const pendingSettlementAccounts = useMemo(() => {
+    void scheduleTick;
+    if (!isDataReady || settlementDismissed) return [];
+    return accounts.filter((account) => accountKindOf(account) === "provident" && providentNeedsSettlement(account));
+  }, [isDataReady, settlementDismissed, accounts, scheduleTick]);
+  const settlementAccount = pendingSettlementAccounts[0] ?? null;
 
   useEffect(() => {
     swiperRef.current?.update();
@@ -532,6 +559,16 @@ function App() {
             onDeleteSavedQuery={handleDeleteSavedQuery}
           />
         </section>
+      )}
+
+      {settlementAccount && (
+        <ProvidentSettlementPopup
+          account={settlementAccount}
+          queueLength={pendingSettlementAccounts.length}
+          accounts={accounts}
+          transferRules={transferRules}
+          onDismiss={() => setSettlementDismissed(true)}
+        />
       )}
 
       <nav className="bottom-nav">
@@ -747,6 +784,10 @@ type AccountBalanceRow = {
   expense: number;
   transferIn: number;
   transferOut: number;
+  /** 公积金结息收入（7/1 手动录入），已包含在 income 中，单独显示 */
+  interest: number;
+  /** 公积金期初余额 */
+  initial: number;
   balance: number;
   count: number;
   id?: number;
@@ -760,18 +801,24 @@ function buildAccountBalanceRows(items: Transaction[], accounts: Account[]): Acc
   return accountRecords.map((accountRecord) => {
     const account = accountRecord.name;
     const kind = accountKindOf(accountRecord);
-    const accountItems = items.filter((item) => transactionBelongsToAccount(item, account));
+    // 公积金期初余额已含起算日（上一个 6/30）及之前的余额，流水只累计起算日之后的，避免重复计入
+    const initialDate = kind === "provident" ? accountRecord.providentInitialDate : undefined;
+    const accountItems = items.filter((item) => transactionBelongsToAccount(item, account) && (!initialDate || item.date > initialDate));
     const income = sumByType(accountItems.filter((item) => item.type !== "transfer"), "income");
     const expense = sumByType(accountItems.filter((item) => item.type !== "transfer"), "expense");
+    const interest = sumByType(accountItems.filter((item) => item.type === "income" && item.category === providentInterestCategory), "income");
     const transferIn = accountItems.filter((item) => item.type === "transfer" && item.toAccount === account).reduce((sum, item) => sum + item.amount, 0);
     const transferOut = accountItems.filter((item) => item.type === "transfer" && (item.account || defaultAccounts[0]) === account).reduce((sum, item) => sum + item.amount, 0);
+    const initial = kind === "provident" ? accountRecord.providentInitialBalance ?? 0 : 0;
     return {
       account,
       income,
       expense,
       transferIn,
       transferOut,
-      balance: income + transferIn - expense - transferOut,
+      interest,
+      initial,
+      balance: initial + income + transferIn - expense - transferOut,
       count: accountItems.length,
       id: accountRecord.id,
       kind,
@@ -1269,7 +1316,8 @@ function HomeAccountFilterControls({
   accountFilters: string[];
   setAccountFilters: React.Dispatch<React.SetStateAction<string[]>>;
 }) {
-  const accountNames = accounts.length ? accounts.map((item) => item.name) : defaultAccounts;
+  // 公积金账户不出现在筛选 chips 里（明细流水仍正常显示）
+  const accountNames = accounts.length ? accounts.filter((item) => accountKindOf(item) !== "provident").map((item) => item.name) : defaultAccounts;
 
   function toggleAccountFilter(account: string) {
     setAccountFilters((current) => (current.includes(account) ? current.filter((item) => item !== account) : [...current, account]));
@@ -3015,7 +3063,9 @@ function transactionAccountKind(item: Transaction, accountKindByName: Map<string
 }
 
 function buildAssetRunwayMetrics(items: Transaction[], accounts: Account[]) {
-  const ordinaryItems = items.filter((item) => item.type !== "transfer");
+  const accountKindByName = new Map(accounts.map((account) => [account.name, accountKindOf(account)]));
+  // 公积金不能随时支取，不计入日常收支速率；但公积金是自己的钱，余额计入「0 收入能活」
+  const ordinaryItems = items.filter((item) => item.type !== "transfer" && transactionAccountKind(item, accountKindByName) !== "provident");
   const averageDayCount = statsAverageDayCount("all", monthKey(), String(new Date().getFullYear()), ordinaryItems);
   const dailyExpense = sumByType(ordinaryItems, "expense") / averageDayCount;
   const dailyIncome = sumByType(ordinaryItems, "income") / averageDayCount;
@@ -3255,16 +3305,27 @@ function AssetsView({ items, accounts }: { items: Transaction[]; accounts: Accou
       <div className="panel">
         <div className="asset-list">
           {rows.map((row) => {
-            const flowGroups: [string, string][][] = [
-              [
-                ["收入", formatAmountPlain(row.income)],
-                ["支出", formatAmountPlain(row.expense)],
-              ],
-              [
-                ["转入", formatAmountPlain(row.transferIn)],
-                ["转出", formatAmountPlain(row.transferOut)],
-              ],
-            ];
+            const flowGroups: [string, string][][] = row.kind === "provident"
+              ? [
+                  [
+                    ["缴存", formatAmountPlain(row.income - row.interest)],
+                    ["结息", formatAmountPlain(row.interest)],
+                  ],
+                  [
+                    ["提取", formatAmountPlain(row.expense + row.transferOut)],
+                    ["转入", formatAmountPlain(row.transferIn)],
+                  ],
+                ]
+              : [
+                  [
+                    ["收入", formatAmountPlain(row.income)],
+                    ["支出", formatAmountPlain(row.expense)],
+                  ],
+                  [
+                    ["转入", formatAmountPlain(row.transferIn)],
+                    ["转出", formatAmountPlain(row.transferOut)],
+                  ],
+                ];
             return (
               <article
                 className="asset-row"
@@ -3278,6 +3339,7 @@ function AssetsView({ items, accounts }: { items: Transaction[]; accounts: Accou
                   <strong>{row.account}</strong>
                   <span>
                     {accountKindLabel[row.kind]} · {row.count} 笔记录
+                    {row.kind === "provident" && row.initial > 0 ? ` · 期初 ${formatAmountPlain(row.initial)}` : ""}
                   </span>
                 </div>
                 <div className="asset-row-balance">
@@ -3373,11 +3435,17 @@ function StatsView({
   const nonTransferItems = items.filter((item) => item.type !== "transfer");
   const ordinaryItems = nonTransferItems.filter((item) => transactionAccountKind(item, accountKindByName) === "cash");
   const investmentItems = nonTransferItems.filter((item) => transactionAccountKind(item, accountKindByName) === "investment");
+  const providentItems = nonTransferItems.filter((item) => transactionAccountKind(item, accountKindByName) === "provident");
+  const providentTransfers = items.filter((item) => item.type === "transfer" && transactionAccountKind(item, accountKindByName) === "provident");
   const expenseTotal = sumByType(ordinaryItems, "expense");
   const incomeTotal = sumByType(ordinaryItems, "income");
   const investmentExpense = sumByType(investmentItems, "expense");
   const investmentIncome = sumByType(investmentItems, "income");
   const investmentProfit = investmentIncome - investmentExpense;
+  // 公积金：按月缴存和手动结息都是账户收入，提取是转出到现金账户（也可记为支出）
+  const providentDeposit = sumByType(providentItems.filter((item) => item.category !== providentInterestCategory), "income");
+  const providentInterest = sumByType(providentItems.filter((item) => item.category === providentInterestCategory), "income");
+  const providentWithdraw = sumByType(providentItems, "expense") + providentTransfers.reduce((sum, item) => sum + item.amount, 0);
   const expenseData = buildCategoryStats(ordinaryItems, categories, "expense");
   const incomeData = buildCategoryStats(ordinaryItems, categories, "income");
   const flowData = buildStatsFlowData(mode === "year" ? allOrdinaryItems : ordinaryItems, mode, month, year);
@@ -3412,6 +3480,22 @@ function StatsView({
           <div>
             <span>理财盈亏</span>
             <strong className={investmentProfit < 0 ? "expense" : ""} title={currency.format(investmentProfit)} style={fitStatsAmountStyle(investmentProfit)}>{currency.format(investmentProfit)}</strong>
+          </div>
+        </div>
+      )}
+      {(providentItems.length > 0 || providentTransfers.length > 0) && (
+        <div className="stats-summary secondary-stats-summary">
+          <div>
+            <span>公积金缴存</span>
+            <strong title={currency.format(providentDeposit)} style={fitStatsAmountStyle(providentDeposit)}>{currency.format(providentDeposit)}</strong>
+          </div>
+          <div>
+            <span>公积金利息</span>
+            <strong title={currency.format(providentInterest)} style={fitStatsAmountStyle(providentInterest)}>{currency.format(providentInterest)}</strong>
+          </div>
+          <div>
+            <span>公积金提取</span>
+            <strong className="expense" title={currency.format(providentWithdraw)} style={fitStatsAmountStyle(providentWithdraw)}>{currency.format(providentWithdraw)}</strong>
           </div>
         </div>
       )}
@@ -4389,6 +4473,12 @@ type AccountDraft = {
   id?: number;
   name: string;
   kind: AccountKind;
+  /** 公积金账户：添加时是当前余额（反推期初），编辑时是期初余额（纠错用） */
+  currentBalance: string;
+  monthlyDeposit: string;
+  monthlyWithdrawal: string;
+  /** 公积金提取的到账账户 */
+  withdrawTarget: string;
   originalName?: string;
   originalKind?: AccountKind;
 };
@@ -4419,11 +4509,21 @@ function AccountSettingsPanel({
     : defaultAccounts.map((name) => ({ name, kind: inferAccountKind(name), createdAt: "" }));
   const accountNames = accountRecords.map((item) => item.name);
   const editingAccount = draft?.id != null ? accountRecords.find((item) => item.id === draft.id) : undefined;
-  const editingDependencies = editingAccount ? accountDependencyCount(editingAccount.name) : 0;
+  const editingDependencies = editingAccount ? accountDependencyCount(editingAccount) : 0;
 
-  function accountDependencyCount(name: string) {
+  function accountDependencyCount(account: Account) {
+    const name = account.name;
     const usageCount = transactions.filter((item) => transactionBelongsToAccount(item, name)).length;
-    const ruleCount = transferRules.filter((rule) => (rule.account || rule.fromAccount) === name || rule.toAccount === name).length;
+    const ruleCount = transferRules.filter((rule) => {
+      const from = rule.account || rule.fromAccount;
+      if (from !== name && rule.toAccount !== name) return false;
+      // 公积金账户自带的缴存/提取周期规则随账户一起删，不算作引用
+      if (accountKindOf(account) === "provident" && from === name) {
+        const type = rule.type || "transfer";
+        if (type === "transfer" || (type === "income" && rule.category === providentDepositCategory)) return false;
+      }
+      return true;
+    }).length;
     const categoryCount = categories.filter((category) => category.defaultAccount === name).length;
     return usageCount + ruleCount + categoryCount;
   }
@@ -4442,15 +4542,22 @@ function AccountSettingsPanel({
   }
 
   function openAddDraft() {
-    setDraft({ name: "", kind: "cash" });
+    setDraft({ name: "", kind: "cash", currentBalance: "", monthlyDeposit: "", monthlyWithdrawal: "", withdrawTarget: "" });
   }
 
   function openEditDraft(account: Account) {
     const kind = accountKindOf(account);
+    // 每月缴存/提取预填自周期规则的当前金额
+    const depositRule = findProvidentDepositRule(transferRules, account.name);
+    const withdrawRule = findProvidentWithdrawRule(transferRules, account.name);
     setDraft({
       id: account.id,
       name: account.name,
       kind,
+      currentBalance: account.providentInitialBalance ? String(account.providentInitialBalance) : "",
+      monthlyDeposit: depositRule ? String(depositRule.amount) : "",
+      monthlyWithdrawal: withdrawRule ? String(withdrawRule.amount) : "",
+      withdrawTarget: withdrawRule?.toAccount ?? "",
       originalName: account.name,
       originalKind: kind,
     });
@@ -4477,8 +4584,11 @@ function AccountSettingsPanel({
     });
   }
 
-  async function changeAccountKind(id: number, kind: AccountKind) {
+  async function changeAccountKind(id: number, name: string, kind: AccountKind, originalKind: AccountKind | undefined) {
     await db.accounts.update(id, { kind });
+    // 改出公积金：缴存收入规则和从其转出的提取转账规则一并删除；
+    // 改为公积金时只设类型，周期规则由保存时按填写的月额度创建
+    if (originalKind === "provident" && kind !== "provident") await removeProvidentRules(name);
   }
 
   async function saveDraft(event: React.FormEvent) {
@@ -4486,24 +4596,61 @@ function AccountSettingsPanel({
     if (!draft) return;
     const name = draft.name.trim();
     if (!name || !canSaveDraft) return;
+    const balanceValue = draft.kind === "provident" ? Math.max(0, Number(draft.currentBalance) || 0) : 0;
+    const monthlyDeposit = draft.kind === "provident" ? Math.max(0, Number(draft.monthlyDeposit) || 0) : 0;
+    const monthlyWithdrawal = draft.kind === "provident" ? Math.max(0, Number(draft.monthlyWithdrawal) || 0) : 0;
+    const today = todayInputValue();
 
     if (draft.id == null) {
       const maxOrder = accountRecords.reduce((max, item) => Math.max(max, item.sortOrder ?? -1), -1);
-      await db.accounts.add({
-        name,
-        kind: draft.kind,
-        createdAt: new Date().toISOString(),
-        sortOrder: maxOrder + 1,
-      });
+      if (draft.kind !== "provident") {
+        await db.accounts.add({ name, kind: draft.kind, createdAt: new Date().toISOString(), sortOrder: maxOrder + 1 });
+      } else {
+        // 期初余额起算于上一个 6/30，与周期规则追平的结果严格一致：
+        // 期初 = 当前余额 − 将补记的缴存总额 + 将补记的提取总额
+        const periodStart = providentPeriodStart(today);
+        const backfillCount = providentBackfillCount(periodStart, today);
+        const initial = Math.round((balanceValue - backfillCount * monthlyDeposit + backfillCount * monthlyWithdrawal) * 100) / 100;
+        await db.accounts.add({
+          name,
+          kind: draft.kind,
+          createdAt: new Date().toISOString(),
+          sortOrder: maxOrder + 1,
+          providentInitialBalance: initial,
+          providentInitialDate: periodStart,
+          // 上一个 6/30 所属年度视为已结息，下一次提醒从下一个 7/1 开始
+          providentSettledYear: Number(periodStart.slice(0, 4)),
+        });
+        // 两条周期规则从上一个 7/1 开始、每月 28 号记账，建好后立即追平到今日
+        const ruleStartDate = `${periodStart.slice(0, 4)}-07-01`;
+        await upsertProvidentDepositRule(name, monthlyDeposit, ruleStartDate);
+        await upsertProvidentWithdrawRule(name, monthlyWithdrawal, draft.withdrawTarget, ruleStartDate);
+        await applyAutoTransfers();
+      }
     } else {
       if (draft.originalName && draft.originalName !== name) await renameAccount(draft.id, draft.originalName, name);
-      if (draft.kind !== draft.originalKind) await changeAccountKind(draft.id, draft.kind);
+      if (draft.kind !== draft.originalKind) await changeAccountKind(draft.id, name, draft.kind, draft.originalKind);
+      if (draft.kind === "provident") {
+        // 期初余额是纯字段（纠错用），直接更新，不重算任何账目
+        const initialDate = editingAccount?.providentInitialDate ?? providentPeriodStart(today);
+        await db.accounts.update(draft.id, {
+          providentInitialBalance: balanceValue,
+          providentInitialDate: initialDate,
+          providentSettledYear: editingAccount?.providentSettledYear ?? Number(initialDate.slice(0, 4)),
+        });
+        // 月额度由周期规则承载：已有规则改金额/到账账户；规则不存在且金额 > 0 时
+        // 以今天为起点新建（lastRunDate = today，不补历史）
+        await upsertProvidentDepositRule(name, monthlyDeposit, today, today);
+        await upsertProvidentWithdrawRule(name, monthlyWithdrawal, draft.withdrawTarget, today, today);
+      }
     }
     closeDraft();
   }
 
   async function deleteDraftAccount() {
     if (draft?.id == null || editingDependencies > 0) return;
+    // 公积金账户的缴存/提取周期规则随账户一起删
+    if (draft.originalKind === "provident") await removeProvidentRules(draft.originalName ?? draft.name);
     await db.accounts.delete(draft.id);
     closeDraft();
   }
@@ -4530,7 +4677,11 @@ function AccountSettingsPanel({
 
   const trimmedDraftName = draft?.name.trim() ?? "";
   const duplicateDraftName = trimmedDraftName !== "" && accountNames.some((name) => name === trimmedDraftName && name !== draft?.originalName);
-  const canSaveDraft = trimmedDraftName !== "" && !duplicateDraftName;
+  // 每月提取大于 0 时必须选到账账户，且不能转回公积金账户自己
+  const withdrawalNeedsTarget = draft?.kind === "provident" && (Number(draft?.monthlyWithdrawal) || 0) > 0;
+  const withdrawTargetValid = !withdrawalNeedsTarget || (draft?.withdrawTarget !== "" && draft?.withdrawTarget !== trimmedDraftName);
+  const canSaveDraft = trimmedDraftName !== "" && !duplicateDraftName && withdrawTargetValid;
+  const withdrawTargetOptions = accountNames.filter((name) => name !== trimmedDraftName);
 
   return (
     <div className="screen-page-content">
@@ -4549,6 +4700,7 @@ function AccountSettingsPanel({
             `${usageCount} 笔记录`,
             `${ruleCount} 条规则`,
             categoryCount > 0 ? `${categoryCount} 个默认分类` : "",
+            kind === "provident" && account.providentInitialBalance ? `期初 ${formatCompactAmount(account.providentInitialBalance)}` : "",
           ]
             .filter(Boolean)
             .join(" · ");
@@ -4622,6 +4774,55 @@ function AccountSettingsPanel({
               onChange={(kind) => setDraft((current) => (current ? { ...current, kind } : current))}
             />
           </div>
+          {draft?.kind === "provident" && (
+            <div className="account-add-provident">
+              <label className="account-field">
+                <span>{draft.id == null ? "当前余额（元）" : "期初余额（元）"}</span>
+                <input
+                  className="text-input"
+                  inputMode="decimal"
+                  placeholder="0.00"
+                  value={draft.currentBalance}
+                  onChange={(event) => setDraft((current) => (current ? { ...current, currentBalance: event.target.value } : current))}
+                />
+              </label>
+              <div className="account-field-pair">
+                <label className="account-field">
+                  <span>每月缴存（元）</span>
+                  <input
+                    className="text-input"
+                    inputMode="decimal"
+                    placeholder="0.00"
+                    value={draft.monthlyDeposit}
+                    onChange={(event) => setDraft((current) => (current ? { ...current, monthlyDeposit: event.target.value } : current))}
+                  />
+                </label>
+                <label className="account-field">
+                  <span>每月提取（元）</span>
+                  <input
+                    className="text-input"
+                    inputMode="decimal"
+                    placeholder="0.00"
+                    value={draft.monthlyWithdrawal}
+                    onChange={(event) => setDraft((current) => (current ? { ...current, monthlyWithdrawal: event.target.value } : current))}
+                  />
+                </label>
+              </div>
+              <TransferAccountSelect
+                label="提取到账"
+                value={draft.withdrawTarget}
+                accounts={withdrawTargetOptions}
+                onChange={(value) => setDraft((current) => (current ? { ...current, withdrawTarget: value } : current))}
+              />
+              {withdrawalNeedsTarget && !withdrawTargetValid && <p className="account-add-note">每月提取大于 0 时需选择到账账户</p>}
+              {draft.id == null ? (
+                <p className="account-add-note">按当前余额反推上一个 6/30 的期初余额，并按月缴存/提取补齐 7/28 至今的账目</p>
+              ) : (
+                <p className="account-add-note">期初余额起算于 {editingAccount?.providentInitialDate ?? "上一个 6/30"}，只累计之后的流水，填错可直接改正</p>
+              )}
+              <p className="account-add-note">每月 28 号自动记账：缴存记「{providentDepositCategory}」收入，提取转账到到账账户；每年 7/1 起提醒手动录入结息。</p>
+            </div>
+          )}
           {!canSaveDraft && (
             <p className="account-add-note">{duplicateDraftName ? "已有同名账户，换一个名字" : "填写账户名称后即可保存"}</p>
           )}
@@ -4644,6 +4845,145 @@ function AccountSettingsPanel({
         </form>
       </CenterPopup>
     </div>
+  );
+}
+
+/**
+ * 公积金年度结息提醒：每年 7/1 起弹出，手动输入实际结息金额（记「公积金利息」收入，日期为当年 7/1），
+ * 同时可调整每月缴存/提取（更新对应周期规则）。多个公积金账户逐个处理，「暂不处理」则下次启动再提醒。
+ */
+function ProvidentSettlementPopup({
+  account,
+  queueLength,
+  accounts,
+  transferRules,
+  onDismiss,
+}: {
+  account: Account;
+  queueLength: number;
+  accounts: Account[];
+  transferRules: TransferRule[];
+  onDismiss: () => void;
+}) {
+  const today = todayInputValue();
+  const year = Number(today.slice(0, 4));
+  const close = useHistoryBackedPopup(
+    true,
+    (visible) => {
+      if (!visible) onDismiss();
+    },
+    "localMoneyProvidentSettlement"
+  );
+  const depositRule = findProvidentDepositRule(transferRules, account.name);
+  const withdrawRule = findProvidentWithdrawRule(transferRules, account.name);
+  const [interest, setInterest] = useState("");
+  const [monthlyDeposit, setMonthlyDeposit] = useState("");
+  const [monthlyWithdrawal, setMonthlyWithdrawal] = useState("");
+  const [withdrawTarget, setWithdrawTarget] = useState("");
+
+  // 多账户逐个处理：切到下一个账户时按它的周期规则重新预填
+  useEffect(() => {
+    setInterest("");
+    setMonthlyDeposit(depositRule ? String(depositRule.amount) : "");
+    setMonthlyWithdrawal(withdrawRule ? String(withdrawRule.amount) : "");
+    setWithdrawTarget(withdrawRule?.toAccount ?? "");
+    // 只在切换账户时重置，规则金额变化（确认后）不应清掉正在填的内容
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [account.id, account.name]);
+
+  const targetOptions = accounts.map((item) => item.name).filter((name) => name !== account.name);
+  const interestValue = Math.max(0, Number(interest) || 0);
+  const depositValue = Math.max(0, Number(monthlyDeposit) || 0);
+  const withdrawalValue = Math.max(0, Number(monthlyWithdrawal) || 0);
+  const targetValid = withdrawalValue <= 0 || (withdrawTarget !== "" && withdrawTarget !== account.name);
+  // 已结息年份落后一年以上时一次性补结：输入截至上一次 6/30 的累计结息金额
+  const settledBaseYear = account.providentSettledYear ?? Number((account.providentInitialDate || account.createdAt || today).slice(0, 4));
+  const multiYearBehind = settledBaseYear < year - 1;
+
+  async function confirmSettlement(event: React.FormEvent) {
+    event.preventDefault();
+    if (!targetValid || account.id == null) return;
+    const now = new Date().toISOString();
+    if (interestValue > 0) {
+      await db.transactions.add({
+        type: "income",
+        amount: Math.round(interestValue * 100) / 100,
+        category: providentInterestCategory,
+        account: account.name,
+        note: `${year - 1}.7.1-${year}.6.30 结息`,
+        date: `${year}-07-01`,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+    // 同步调整每月缴存/提取的周期规则；规则被手动删过的话按新值重建，从下个记账日开始（不补历史）
+    await upsertProvidentDepositRule(account.name, depositValue, today, today);
+    await upsertProvidentWithdrawRule(account.name, withdrawalValue, withdrawTarget, today, today);
+    // 落后多年也只结一次：直接记为今年已结息
+    await db.accounts.update(account.id, { providentSettledYear: year });
+    // 还有下一个账户时保持弹窗（数据变化会切过去），最后一个处理完才关闭
+    if (queueLength <= 1) close();
+  }
+
+  return (
+    <CenterPopup visible onMaskClick={close} bodyClassName="account-add-dialog">
+      <form className="account-add-form" onSubmit={confirmSettlement}>
+        <div className="account-add-head">
+          <h3>公积金结息</h3>
+          <button type="button" className="account-add-close" aria-label="关闭" onClick={close}>
+            <X size={20} />
+          </button>
+        </div>
+        <p className="account-add-note">
+          「{account.name}」{year - 1}.7.1 – {year}.6.30 年度已结息。
+          {multiYearBehind
+            ? "之前年度一并处理：请输入截至上一次 6/30 的累计结息金额。"
+            : "请输入实际结息金额，会记为当年 7/1 的「公积金利息」收入。"}
+        </p>
+        <label className="account-field">
+          <span>结息金额（元）</span>
+          <input
+            className="text-input"
+            inputMode="decimal"
+            placeholder="0.00"
+            value={interest}
+            onChange={(event) => setInterest(event.target.value)}
+          />
+        </label>
+        <div className="account-field-pair">
+          <label className="account-field">
+            <span>每月缴存（元）</span>
+            <input
+              className="text-input"
+              inputMode="decimal"
+              placeholder="0.00"
+              value={monthlyDeposit}
+              onChange={(event) => setMonthlyDeposit(event.target.value)}
+            />
+          </label>
+          <label className="account-field">
+            <span>每月提取（元）</span>
+            <input
+              className="text-input"
+              inputMode="decimal"
+              placeholder="0.00"
+              value={monthlyWithdrawal}
+              onChange={(event) => setMonthlyWithdrawal(event.target.value)}
+            />
+          </label>
+        </div>
+        <TransferAccountSelect label="提取到账" value={withdrawTarget} accounts={targetOptions} onChange={setWithdrawTarget} />
+        {!targetValid && <p className="account-add-note">每月提取大于 0 时需选择到账账户</p>}
+        <div className="account-add-actions">
+          <button type="button" className="account-add-cancel" onClick={close}>
+            暂不处理
+          </button>
+          <button type="submit" className="account-add-submit" disabled={!targetValid}>
+            确认结息
+          </button>
+        </div>
+      </form>
+    </CenterPopup>
   );
 }
 

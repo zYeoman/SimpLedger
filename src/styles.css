@@ -3536,6 +3536,15 @@ h1 {
   font-weight: 900;
 }
 
+.account-add-provident {
+  display: grid;
+  gap: 10px;
+}
+
+.account-add-provident .account-add-note {
+  grid-column: 1 / -1;
+}
+
 .account-add-note {
   margin: 0;
   color: #77807b;
@@ -3651,6 +3660,8 @@ h1 {
   color: #77807b;
   font-size: 12px;
 }
+
+/* 公积金期初余额编辑器 */
 
 /* 全屏管理页：与记一笔页同一套范式 */
 .screen-page {
@@ -3805,4 +3816,11 @@ h1 {
   font-size: 13px;
   font-weight: 800;
   text-align: left;
+}
+
+/* 公积金表单：每月缴存/提取并排 */
+.account-field-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
 }
