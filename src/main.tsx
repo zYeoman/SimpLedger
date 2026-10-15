@@ -4753,7 +4753,13 @@ function AccountSettingsPanel({
           </button>
         </div>
       )}
-      <CenterPopup visible={draft !== null} onMaskClick={closeDraft} bodyClassName="account-add-dialog">
+      <CenterPopup
+        visible={draft !== null}
+        onMaskClick={closeDraft}
+        bodyClassName="account-add-dialog"
+        // wrap 默认 max-width 仅 75vw，body 的 min(92vw,420px) 会向右溢出导致弹窗偏移；锁定 wrap 宽度与 body 一致
+        style={{ "--max-width": "min(92vw, 420px)", "--min-width": "min(92vw, 420px)" } as React.CSSProperties}
+      >
         <form className="account-add-form" onSubmit={saveDraft}>
           <div className="account-add-head">
             <h3>{draft?.id == null ? "添加账户" : "编辑账户"}</h3>
@@ -4929,7 +4935,12 @@ function ProvidentSettlementPopup({
   }
 
   return (
-    <CenterPopup visible onMaskClick={close} bodyClassName="account-add-dialog">
+    <CenterPopup
+      visible
+      onMaskClick={close}
+      bodyClassName="account-add-dialog"
+      style={{ "--max-width": "min(92vw, 420px)", "--min-width": "min(92vw, 420px)" } as React.CSSProperties}
+    >
       <form className="account-add-form" onSubmit={confirmSettlement}>
         <div className="account-add-head">
           <h3>公积金结息</h3>
