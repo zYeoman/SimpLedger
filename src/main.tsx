@@ -3339,7 +3339,6 @@ function AssetsView({ items, accounts }: { items: Transaction[]; accounts: Accou
                   <strong>{row.account}</strong>
                   <span>
                     {accountKindLabel[row.kind]} · {row.count} 笔记录
-                    {row.kind === "provident" && row.initial > 0 ? ` · 期初 ${formatAmountPlain(row.initial)}` : ""}
                   </span>
                 </div>
                 <div className="asset-row-balance">
@@ -3446,6 +3445,10 @@ function StatsView({
   const providentDeposit = sumByType(providentItems.filter((item) => item.category !== providentInterestCategory), "income");
   const providentInterest = sumByType(providentItems.filter((item) => item.category === providentInterestCategory), "income");
   const providentWithdraw = sumByType(providentItems, "expense") + providentTransfers.reduce((sum, item) => sum + item.amount, 0);
+  // 公积金余额是当前实际余额（期初 + 全部流水），不随统计周期变化，与资产页口径一致
+  const providentBalance = buildAccountBalanceRows(allItems, accounts)
+    .filter((row) => row.kind === "provident")
+    .reduce((sum, row) => sum + row.balance, 0);
   const expenseData = buildCategoryStats(ordinaryItems, categories, "expense");
   const incomeData = buildCategoryStats(ordinaryItems, categories, "income");
   const flowData = buildStatsFlowData(mode === "year" ? allOrdinaryItems : ordinaryItems, mode, month, year);
@@ -3455,12 +3458,12 @@ function StatsView({
     <section className="stats-page">
       <div className="stats-summary">
         <div>
-          <span>支出</span>
-          <strong className="expense" title={currency.format(expenseTotal)} style={fitStatsAmountStyle(expenseTotal)}>{currency.format(expenseTotal)}</strong>
-        </div>
-        <div>
           <span>收入</span>
           <strong title={currency.format(incomeTotal)} style={fitStatsAmountStyle(incomeTotal)}>{currency.format(incomeTotal)}</strong>
+        </div>
+        <div>
+          <span>支出</span>
+          <strong className="expense" title={currency.format(expenseTotal)} style={fitStatsAmountStyle(expenseTotal)}>{currency.format(expenseTotal)}</strong>
         </div>
         <div>
           <span>结余</span>
@@ -3470,15 +3473,15 @@ function StatsView({
       {investmentItems.length > 0 && (
         <div className="stats-summary secondary-stats-summary">
           <div>
-            <span>理财支出</span>
-            <strong className="expense" title={currency.format(investmentExpense)} style={fitStatsAmountStyle(investmentExpense)}>{currency.format(investmentExpense)}</strong>
-          </div>
-          <div>
-            <span>理财收入</span>
+            <span>盈利</span>
             <strong title={currency.format(investmentIncome)} style={fitStatsAmountStyle(investmentIncome)}>{currency.format(investmentIncome)}</strong>
           </div>
           <div>
-            <span>理财盈亏</span>
+            <span>亏损</span>
+            <strong className="expense" title={currency.format(investmentExpense)} style={fitStatsAmountStyle(investmentExpense)}>{currency.format(investmentExpense)}</strong>
+          </div>
+          <div>
+            <span>盈亏</span>
             <strong className={investmentProfit < 0 ? "expense" : ""} title={currency.format(investmentProfit)} style={fitStatsAmountStyle(investmentProfit)}>{currency.format(investmentProfit)}</strong>
           </div>
         </div>
@@ -3486,16 +3489,16 @@ function StatsView({
       {(providentItems.length > 0 || providentTransfers.length > 0) && (
         <div className="stats-summary secondary-stats-summary">
           <div>
-            <span>公积金缴存</span>
-            <strong title={currency.format(providentDeposit)} style={fitStatsAmountStyle(providentDeposit)}>{currency.format(providentDeposit)}</strong>
-          </div>
-          <div>
-            <span>公积金利息</span>
-            <strong title={currency.format(providentInterest)} style={fitStatsAmountStyle(providentInterest)}>{currency.format(providentInterest)}</strong>
+            <span>公积金存入</span>
+            <strong title={currency.format(providentDeposit)} style={fitStatsAmountStyle(providentDeposit)}>{currency.format(providentDeposit+providentInterest)}</strong>
           </div>
           <div>
             <span>公积金提取</span>
             <strong className="expense" title={currency.format(providentWithdraw)} style={fitStatsAmountStyle(providentWithdraw)}>{currency.format(providentWithdraw)}</strong>
+          </div>
+          <div>
+            <span>公积金余额</span>
+            <strong title={currency.format(providentBalance)} style={fitStatsAmountStyle(providentBalance)}>{currency.format(providentBalance)}</strong>
           </div>
         </div>
       )}
