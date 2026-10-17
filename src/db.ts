@@ -156,7 +156,7 @@ export const defaultCategories: Category[] = [
   { name: "工资", type: "income", color: "#2f7d62", icon: "money" },
   { name: "奖金", type: "income", color: "#c28a2c", icon: "piggy" },
   { name: "兼职", type: "income", color: "#3d8b93", icon: "wallet" },
-  { name: "公积金", type: "income", color: "#c28a2c", icon: "piggy" },
+  { name: "公积金缴存", type: "income", color: "#c28a2c", icon: "piggy" },
   { name: "公积金利息", type: "income", color: "#3a8d8f", icon: "coins" },
   { name: "其他", type: "income", color: "#6f7680", icon: "wallet" },
 ];

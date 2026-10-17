@@ -3064,8 +3064,9 @@ function transactionAccountKind(item: Transaction, accountKindByName: Map<string
 
 function buildAssetRunwayMetrics(items: Transaction[], accounts: Account[]) {
   const accountKindByName = new Map(accounts.map((account) => [account.name, accountKindOf(account)]));
-  // 公积金不能随时支取，不计入日常收支速率；但公积金是自己的钱，余额计入「0 收入能活」
-  const ordinaryItems = items.filter((item) => item.type !== "transfer" && transactionAccountKind(item, accountKindByName) !== "provident");
+  // 日均收支只算现金账户：理财盈亏、公积金缴存/提取都不计入日常收支速率；
+  // 但理财和公积金都是自己的钱，余额计入「0 收入能活」
+  const ordinaryItems = items.filter((item) => item.type !== "transfer" && transactionAccountKind(item, accountKindByName) === "cash");
   const averageDayCount = statsAverageDayCount("all", monthKey(), String(new Date().getFullYear()), ordinaryItems);
   const dailyExpense = sumByType(ordinaryItems, "expense") / averageDayCount;
   const dailyIncome = sumByType(ordinaryItems, "income") / averageDayCount;
@@ -3490,7 +3491,7 @@ function StatsView({
         <div className="stats-summary secondary-stats-summary">
           <div>
             <span>公积金存入</span>
-            <strong title={currency.format(providentDeposit)} style={fitStatsAmountStyle(providentDeposit)}>{currency.format(providentDeposit+providentInterest)}</strong>
+            <strong title={currency.format(providentDeposit + providentInterest)} style={fitStatsAmountStyle(providentDeposit + providentInterest)}>{currency.format(providentDeposit + providentInterest)}</strong>
           </div>
           <div>
             <span>公积金提取</span>
@@ -4557,7 +4558,7 @@ function AccountSettingsPanel({
       id: account.id,
       name: account.name,
       kind,
-      currentBalance: account.providentInitialBalance ? String(account.providentInitialBalance) : "",
+      currentBalance: account.providentInitialBalance != null ? String(account.providentInitialBalance) : "",
       monthlyDeposit: depositRule ? String(depositRule.amount) : "",
       monthlyWithdrawal: withdrawRule ? String(withdrawRule.amount) : "",
       withdrawTarget: withdrawRule?.toAccount ?? "",
